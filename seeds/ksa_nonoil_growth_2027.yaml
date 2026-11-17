@@ -1,0 +1,26 @@
+# Target question (Pass 3) — tree intentionally empty until Product provides it.
+# Default seed remains seeds/ksa_macro_2026.yaml until this tree lands.
+# Orchestrator reports "not ready" (no forecast) while sub_questions is empty.
+
+question:
+  id: ksa_nonoil_growth_2027
+  text: >-
+    Will Saudi real non-oil activities grow by at least 4.5% in 2027, according
+    to GASTAT's first estimate of 2027 annual real GDP?
+  target_variable: "real growth of non-oil activities 2027 vs 2026"
+  threshold: 4.5
+  horizon: "GASTAT's first estimate of 2027 annual real GDP"
+  zone: KSA
+  unit: percent
+  resolution_source: "GASTAT first annual estimate"
+  resolution_rule: >-
+    Resolve YES if GASTAT's first estimate of 2027 annual real GDP shows real
+    growth of non-oil activities (2027 vs 2026) >= 4.5%; otherwise NO.
+    The 4.5% threshold is anchored on the IMF Article IV forecast of July 2026.
+  region: KSA
+  illustrative: false
+
+# TODO: tree provided by the Product team
+sub_questions: []
+
+sources: []

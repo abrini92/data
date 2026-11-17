@@ -10,7 +10,15 @@ question:
   text: >-
     Probability that CST approves Starlink's residential service, open to the
     public, in KSA before 31 Dec 2027.
+  target_variable: "CST residential Starlink service approval (binary)"
+  threshold: 1.0
   horizon: "2027-12-31"
+  zone: KSA
+  unit: probability
+  resolution_source: "CST public licensing / authorisation notices"
+  resolution_rule: >-
+    Resolve YES if CST has publicly authorised Starlink residential service open
+    to the public in KSA on or before 2027-12-31; otherwise NO.
   region: KSA
   illustrative: true
 

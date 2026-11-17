@@ -7,7 +7,15 @@ question:
     ILLUSTRATIVE — Probability that the next published World Bank observation of
     Saudi Arabia individuals-using-the-internet (% of population, IT.NET.USER.ZS)
     remains at or above 95%.
-  horizon: "2027-12-31"
+  target_variable: "IT.NET.USER.ZS (individuals using the Internet, % of population)"
+  threshold: 95.0
+  horizon: "next published World Bank observation after seed date (calendar year series)"
+  zone: KSA
+  unit: probability
+  resolution_source: "World Bank Indicators API (IT.NET.USER.ZS, SAU)"
+  resolution_rule: >-
+    Resolve YES if the next published SAU observation of IT.NET.USER.ZS is >= 95;
+    otherwise NO. Uses the first new annual point after the forecast_at date.
   region: KSA
   illustrative: true
 

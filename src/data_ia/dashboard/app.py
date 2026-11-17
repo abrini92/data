@@ -52,7 +52,7 @@ try:
     snap = (
         session.query(DailySnapshot)
         .filter_by(question_id=qid)
-        .order_by(desc(DailySnapshot.as_of))
+        .order_by(desc(DailySnapshot.created_at), desc(DailySnapshot.as_of))
         .first()
     )
 

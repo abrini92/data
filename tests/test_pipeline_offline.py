@@ -17,6 +17,7 @@ def sqlite_env(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db.as_posix()}")
     monkeypatch.setenv("LLM_PROVIDER", "stub")
     monkeypatch.setenv("COLLECT_REAL_SOURCES", "false")
+    monkeypatch.setenv("USE_SYNTHETIC", "false")
     from data_ia.config import get_settings
 
     get_settings.cache_clear()
@@ -39,7 +40,8 @@ def test_offline_cycle_produces_probability(sqlite_env, monkeypatch):
     assert result["final_probability"] is not None
     assert 0.0 <= result["final_probability"] <= 1.0
     assert result["disclaimer"]
-    assert "ILLUSTRATIVE" in result["disclaimer"].upper() or "stub" in result["disclaimer"].lower()
+    assert "ILLUSTRATIVE" in result["disclaimer"].upper() or "SYNTHETIC" in result["disclaimer"].upper() or "stub" in result["disclaimer"].lower()
+    assert result.get("forecast_registry_id") is not None
     agents_ok = {r["agent"]: r["ok"] for r in result["agent_results"]}
     assert agents_ok.get("orchestrator") is True
     assert agents_ok.get("strategist") is True
@@ -57,6 +59,17 @@ def test_optional_starlink_seed_still_runs(sqlite_env, monkeypatch):
     result = run_offline_cycle(seed_path=seed, persist=True)
     assert result["final_probability"] is not None
     assert 0.0 <= result["final_probability"] <= 1.0
+
+
+def test_nonoil_seed_not_ready(sqlite_env, monkeypatch):
+    from data_ia.agents.pipeline import run_offline_cycle
+    from data_ia.config import get_settings
+
+    seed = REPO_ROOT / "seeds" / "ksa_nonoil_growth_2027.yaml"
+    get_settings.cache_clear()
+    result = run_offline_cycle(seed_path=seed, persist=True)
+    assert result.get("not_ready") is True
+    assert result.get("final_probability") is None
 
 
 @pytest.mark.postgres
