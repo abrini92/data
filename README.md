@@ -1,8 +1,8 @@
-# Data IA — version 1 (+ Pass 2 connectors)
+﻿# Data IA — version 1 (+ Pass 2 connectors)
 
 Internal **stc** decision engine: a question is broken into a tree of sub-questions, each with daily estimates, fused into one final probability.
 
-**Default seed (ILLUSTRATIVE):** short-horizon KSA macro question — probability that Saudi Arabia real GDP growth for 2026 is ≥ 3.5% (`seeds/ksa_macro_2026.yaml`). Starlink remains an optional example only.
+**Default seed (ILLUSTRATIVE):** short-horizon KSA indicator question — probability that the next published World Bank observation of Saudi Arabia individuals-using-the-internet (`IT.NET.USER.ZS`) remains at or above 95% (`seeds/ksa_macro_2026.yaml`). Starlink remains an optional example only (`seeds/starlink_ksa.yaml` + `TAXONOMY_PATH=config/taxonomy_starlink.yaml`).
 
 Principle: LLMs extract under control; reproducible models calculate. No LLM output enters the maths without schema and range validation.
 
@@ -44,12 +44,10 @@ $env:COLLECT_REAL_SOURCES="true"; python -m data_ia.cli collect --all
 | `worldbank` | REST JSON Indicators API (SAU) | none | World Bank open data |
 | `imf` | SDMX 3.0 WEO | none | IMF data terms |
 | `comtrade` | Public preview API | none | Rate-limited preview |
-| `gastat` | stats.gov.sa developer | `GASTAT_API_KEY` | Skip if key absent |
-| `cma` | opendataapi.cma.gov.sa | none* | CMA open data terms |
+| `gastat` | stats.gov.sa / cards API | optional `GASTAT_API_KEY` | Skip if auth required |
+| `cma` | opendataapi.cma.gov.sa | none | CMA open data; live may time out |
 | `eia` | api.eia.gov | `EIA_API_KEY` | U.S. public domain; skip if absent |
 | `sama` | optional | — | Skipped live (no scraping) |
-
-\*CMA paths vary; live failure falls back to fixture.
 
 **Do not scrape** Umm Al-Qura, KAPSARC, Ookla, Saudi Exchange, or Etimad salary APIs (terms / PDPL). Respect robots.txt and rate limits; User-Agent is `DataIA/0.2`.
 
@@ -91,7 +89,7 @@ Correlation groups / ρ: `config/sources.yaml` and seed `correlation_groups` / `
 
 ## Seeds
 
-- **Default:** `seeds/ksa_macro_2026.yaml` (ILLUSTRATIVE KSA macro)
+- **Default:** `seeds/ksa_macro_2026.yaml` (ILLUSTRATIVE KSA short-horizon indicator)
 - Optional: `seeds/starlink_ksa.yaml` + `TAXONOMY_PATH=config/taxonomy_starlink.yaml`
 - Brier set: `seeds/synthetic_resolved.yaml` — **never present as real**
 
