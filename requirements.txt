@@ -1,0 +1,18 @@
+# Install with: pip install -e ".[dev]"
+# Prefer pyproject.toml. PyMC is optional: pip install -e ".[dev,bayes]"
+
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+sqlalchemy>=2.0
+psycopg[binary]>=3.1
+pgvector>=0.2
+apscheduler>=3.10
+pydantic>=2.5
+pydantic-settings>=2.1
+pyyaml>=6.0
+httpx>=0.26
+streamlit>=1.30
+python-dotenv>=1.0
+pytest>=8.0
+pytest-cov>=4.1
