@@ -2,8 +2,11 @@
 .venv/
 venv/
 __pycache__/
+**/__pycache__/
 *.py[cod]
+*$py.class
 *.egg-info/
+.eggs/
 .pytest_cache/
 .coverage
 htmlcov/
@@ -16,6 +19,9 @@ build/
 .idea/
 .vscode/
 pgdata/
+# Local DB + collector caches (never commit)
 data/*.db
 data/*.db-*
+data/raw/
+data/cache/
 *.db
