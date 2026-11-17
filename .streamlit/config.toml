@@ -1,0 +1,3 @@
+[browser]
+# PDPL: Streamlit must not send usage stats by default.
+gatherUsageStats = false
