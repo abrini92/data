@@ -1,0 +1,32 @@
+# Class priors for source reliability shrinkage (lambda_N = N/(N+N0)).
+# ILLUSTRATIVE defaults — not calibrated on real CST data.
+
+regulator:
+  bias: 0.0
+  variance: 0.04
+  n0: 5.0
+
+press:
+  bias: 0.05
+  variance: 0.12
+  n0: 5.0
+
+open:
+  bias: 0.0
+  variance: 0.10
+  n0: 5.0
+
+social:
+  bias: 0.10
+  variance: 0.25
+  n0: 8.0
+
+agreement:
+  bias: 0.0
+  variance: 0.06
+  n0: 4.0
+
+internal:
+  bias: 0.0
+  variance: 0.05
+  n0: 4.0

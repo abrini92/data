@@ -1,0 +1,78 @@
+# ILLUSTRATIVE/SYNTHETIC resolved short-horizon questions for Brier proof.
+# NEVER present these numbers as real outcomes.
+
+resolved_questions:
+  - id: synth_reg_consult_q1
+    text: "SYNTHETIC — Would a published CST consultation close within 90 days?"
+    probability: 0.72
+    outcome: 1
+    resolved_on: "2025-06-01"
+    label: ILLUSTRATIVE/SYNTHETIC
+    baseline_probability: 0.5
+
+  - id: synth_partner_mou_q2
+    text: "SYNTHETIC — Would a local satcom MoU be announced within 60 days?"
+    probability: 0.40
+    outcome: 0
+    resolved_on: "2025-07-15"
+    label: ILLUSTRATIVE/SYNTHETIC
+    baseline_probability: 0.5
+
+  - id: synth_trial_license_q3
+    text: "SYNTHETIC — Would a limited trial licence appear within 120 days?"
+    probability: 0.55
+    outcome: 1
+    resolved_on: "2025-08-20"
+    label: ILLUSTRATIVE/SYNTHETIC
+    baseline_probability: 0.5
+
+  - id: synth_press_deny_q4
+    text: "SYNTHETIC — Would a major outlet report an explicit denial within 30 days?"
+    probability: 0.25
+    outcome: 0
+    resolved_on: "2025-09-10"
+    label: ILLUSTRATIVE/SYNTHETIC
+    baseline_probability: 0.5
+
+  - id: synth_spectrum_note_q5
+    text: "SYNTHETIC — Would a spectrum technical note be posted within 45 days?"
+    probability: 0.60
+    outcome: 0
+    resolved_on: "2025-10-01"
+    label: ILLUSTRATIVE/SYNTHETIC
+    baseline_probability: 0.5
+
+  - id: synth_ceo_hint_q6
+    text: "SYNTHETIC — Would an executive hint at residential timing within 90 days?"
+    probability: 0.35
+    outcome: 1
+    resolved_on: "2025-10-20"
+    label: ILLUSTRATIVE/SYNTHETIC
+    baseline_probability: 0.5
+
+# Paired (z, x) errors for source reliability demos — ILLUSTRATIVE only.
+source_errors:
+  - source_id: cst_gov_sa
+    resolved_id: synth_reg_consult_q1
+    z: 0.80
+    x: 1.0
+  - source_id: cst_gov_sa
+    resolved_id: synth_trial_license_q3
+    z: 0.50
+    x: 1.0
+  - source_id: arab_news_starlink
+    resolved_id: synth_partner_mou_q2
+    z: 0.55
+    x: 0.0
+  - source_id: arab_news_starlink
+    resolved_id: synth_press_deny_q4
+    z: 0.30
+    x: 0.0
+  - source_id: reuters_satcom
+    resolved_id: synth_spectrum_note_q5
+    z: 0.70
+    x: 0.0
+  - source_id: reuters_satcom
+    resolved_id: synth_ceo_hint_q6
+    z: 0.45
+    x: 1.0

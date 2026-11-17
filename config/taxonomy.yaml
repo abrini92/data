@@ -1,0 +1,43 @@
+# Aggregation taxonomy for the Starlink KSA seed (ILLUSTRATIVE).
+# Formula: root uses weighted_logit over three branches (slide 7 style).
+
+root:
+  type: weighted_logit
+  children:
+    - id: regulatory_track
+      weight: 0.45
+    - id: commercial_readiness
+      weight: 0.30
+    - id: geopolitical_fit
+      weight: 0.25
+
+regulatory_track:
+  type: weighted_logit
+  children:
+    - id: cst_process_active
+      weight: 0.55
+    - id: spectrum_clearance
+      weight: 0.45
+
+commercial_readiness:
+  type: weighted_logit
+  children:
+    - id: local_partner_signal
+      weight: 0.50
+    - id: public_service_intent
+      weight: 0.50
+
+geopolitical_fit:
+  type: leaf
+
+cst_process_active:
+  type: leaf
+
+spectrum_clearance:
+  type: leaf
+
+local_partner_signal:
+  type: leaf
+
+public_service_intent:
+  type: leaf

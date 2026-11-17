@@ -1,0 +1,114 @@
+# ILLUSTRATIVE seed for Data IA v1 — not a real forecast.
+# Question: CST / Starlink residential service in KSA before 31 Dec 2027.
+
+question:
+  id: starlink_ksa_residential_2027
+  text: >-
+    Probability that CST approves Starlink's residential service, open to the
+    public, in KSA before 31 Dec 2027.
+  horizon: "2027-12-31"
+  region: KSA
+  illustrative: true
+
+sub_questions:
+  - id: root
+    parent_id: null
+    text: Final aggregated probability (taxonomy root)
+    node_type: weighted_logit
+    weight: 1.0
+    illustrative: true
+    sort_order: 0
+
+  - id: regulatory_track
+    parent_id: root
+    text: Regulatory path at CST is progressing toward residential approval
+    node_type: weighted_logit
+    weight: 0.45
+    illustrative: true
+    sort_order: 1
+
+  - id: cst_process_active
+    parent_id: regulatory_track
+    text: ILLUSTRATIVE — Evidence of an active CST licensing / consultation process
+    node_type: leaf
+    weight: 0.55
+    illustrative: true
+    sort_order: 2
+
+  - id: spectrum_clearance
+    parent_id: regulatory_track
+    text: ILLUSTRATIVE — Spectrum / NGSO constraints appear manageable in KSA
+    node_type: leaf
+    weight: 0.45
+    illustrative: true
+    sort_order: 3
+
+  - id: commercial_readiness
+    parent_id: root
+    text: Commercial packaging toward a public residential offer
+    node_type: weighted_logit
+    weight: 0.30
+    illustrative: true
+    sort_order: 4
+
+  - id: local_partner_signal
+    parent_id: commercial_readiness
+    text: ILLUSTRATIVE — Local partner / wholesale signals consistent with retail intent
+    node_type: leaf
+    weight: 0.50
+    illustrative: true
+    sort_order: 5
+
+  - id: public_service_intent
+    parent_id: commercial_readiness
+    text: ILLUSTRATIVE — Public statements imply residential (not only enterprise/gov) scope
+    node_type: leaf
+    weight: 0.50
+    illustrative: true
+    sort_order: 6
+
+  - id: geopolitical_fit
+    parent_id: root
+    text: ILLUSTRATIVE — Broader policy / industrial fit does not block approval
+    node_type: leaf
+    weight: 0.25
+    illustrative: true
+    sort_order: 7
+
+sources:
+  - id: cst_gov_sa
+    name: Communications, Space & Technology Commission (CST)
+    url: https://www.cst.gov.sa/
+    source_class: regulator
+    publisher: CST
+    freshness_days: 7
+    usage_rights: public_website
+    stub_snippet: >-
+      ILLUSTRATIVE stub — public regulatory pages; no extracted real probability.
+
+  - id: spa_gov_sa
+    name: Saudi Space Agency
+    url: https://ssa.gov.sa/
+    source_class: regulator
+    publisher: SSA
+    freshness_days: 14
+    usage_rights: public_website
+    stub_snippet: ILLUSTRATIVE stub — space-sector context pages.
+
+  - id: arab_news_starlink
+    name: Arab News — Starlink / satellite broadband coverage
+    url: https://www.arabnews.com/
+    source_class: press
+    publisher: Arab News
+    freshness_days: 3
+    usage_rights: public_website_fair_use_snippet
+    stub_snippet: ILLUSTRATIVE stub — press mentions of satellite broadband in KSA.
+
+  - id: reuters_satcom
+    name: Reuters — satcom / licensing wires
+    url: https://www.reuters.com/
+    source_class: press
+    publisher: Reuters
+    freshness_days: 3
+    usage_rights: public_website_fair_use_snippet
+    stub_snippet: ILLUSTRATIVE stub — international wire context.
