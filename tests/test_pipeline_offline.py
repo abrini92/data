@@ -47,6 +47,52 @@ def test_offline_cycle_produces_probability(sqlite_env, monkeypatch):
     assert agents_ok.get("strategist") is True
 
 
+def test_cycle_default_seed_with_clean_environment(tmp_path, monkeypatch):
+    """Default seed path must work with no SEED_PATH / no .env file."""
+    from pathlib import Path
+
+    from data_ia.agents.pipeline import run_offline_cycle
+    from data_ia.config import Settings, get_settings
+    from data_ia.db.session import reset_engine
+
+    # Leave the repo .env behind so Settings does not pick it up.
+    monkeypatch.chdir(tmp_path)
+    for var in (
+        "SEED_PATH",
+        "TAXONOMY_PATH",
+        "SOURCE_PRIORS_PATH",
+        "PRIOR_MAPPING_PATH",
+        "SOURCES_REGISTRY_PATH",
+        "LLM_PROVIDER",
+        "COLLECT_REAL_SOURCES",
+        "USE_SYNTHETIC",
+        "LLM_API_KEY",
+        "EIA_API_KEY",
+        "GASTAT_API_KEY",
+        "SAMA_API_KEY",
+    ):
+        monkeypatch.delenv(var, raising=False)
+
+    db = tmp_path / "clean.db"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db.as_posix()}")
+    get_settings.cache_clear()
+    reset_engine()
+
+    settings = Settings(_env_file=None)
+    assert Path(settings.seed_path).is_file(), f"default seed missing: {settings.seed_path}"
+    get_settings.cache_clear()
+    try:
+        result = run_offline_cycle(persist=True)
+    finally:
+        get_settings.cache_clear()
+        reset_engine()
+
+    assert result["final_probability"] is not None
+    assert 0.0 <= result["final_probability"] <= 1.0
+    agents_ok = {r["agent"]: r["ok"] for r in result["agent_results"]}
+    assert agents_ok.get("strategist") is True
+
+
 def test_optional_starlink_seed_still_runs(sqlite_env, monkeypatch):
     from data_ia.agents.pipeline import run_offline_cycle
     from data_ia.config import get_settings
