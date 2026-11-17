@@ -10,7 +10,8 @@ import yaml
 
 from data_ia.agents.base import Agent, AgentResult
 from data_ia.config import get_settings
-from data_ia.math.aggregation import evaluate_taxonomy
+from data_ia.math.aggregation import evaluate_taxonomy, taxonomy_leaf_ids
+from data_ia.math.constants import PROB_EPS
 from data_ia.math.labels import MixedLabelError, assert_homogeneous_labels, normalize_label
 from data_ia.math.sources import (
     ClassPrior,
@@ -109,7 +110,7 @@ class StrategistAgent(Agent):
                 group_rho=corr_rho,
             )
             # Clip fused estimate into probability domain for taxonomy leaves
-            p = float(np.clip(fusion.estimate, 1e-6, 1 - 1e-6))
+            p = float(np.clip(fusion.estimate, PROB_EPS, 1.0 - PROB_EPS))
             leaf_probs[leaf_id] = p
             leaf_vars[leaf_id] = fusion.variance
             for c in fusion.contributions:
@@ -134,7 +135,55 @@ class StrategistAgent(Agent):
         total_w = sum(all_weights.values()) or 1.0
         source_weights = {k: v / total_w for k, v in all_weights.items()}
 
-        agg = evaluate_taxonomy(taxonomy, leaf_probs)
+        required_leaves = taxonomy_leaf_ids(taxonomy)
+        missing_leaves = [lid for lid in required_leaves if lid not in leaf_probs]
+        if missing_leaves:
+            return AgentResult(
+                agent=self.name,
+                ok=False,
+                checks=["has_accepted", "labels", "taxonomy_leaves"],
+                errors=[
+                    f"missing leaf probability for {lid!r} "
+                    "(all observations quarantined or absent)"
+                    for lid in missing_leaves
+                ],
+                failure_action=self.on_failure,
+                produced={
+                    "missing_leaves": missing_leaves,
+                    "stale": True,
+                    "not_publishable": True,
+                    "final_probability": None,
+                    "leaf_estimates": leaf_meta,
+                    "source_weights": source_weights,
+                    "disclaimer": (
+                        "STALE — taxonomy leaves missing after quarantine; "
+                        "answer not publishable."
+                    ),
+                },
+            )
+
+        try:
+            agg = evaluate_taxonomy(taxonomy, leaf_probs)
+        except KeyError as exc:
+            # Defensive: leaf reported as missing, answer stale / not publishable.
+            return AgentResult(
+                agent=self.name,
+                ok=False,
+                checks=["has_accepted", "labels", "taxonomy_leaves"],
+                errors=[str(exc)],
+                failure_action=self.on_failure,
+                produced={
+                    "missing_leaves": [str(exc)],
+                    "stale": True,
+                    "not_publishable": True,
+                    "final_probability": None,
+                    "leaf_estimates": leaf_meta,
+                    "source_weights": source_weights,
+                    "disclaimer": (
+                        "STALE — taxonomy leaf KeyError; answer not publishable."
+                    ),
+                },
+            )
         # Crude interval from leaf variances propagated via sensitivity abs-sum
         # (deck silent; documented choice in README).
         sens = agg.sensitivities

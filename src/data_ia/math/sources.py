@@ -302,7 +302,9 @@ def _correlation_precision_scales(
         claimed.update(present)
         if len(present) < 2:
             continue
-        rho = float(rhos.get(gid, 0.0))
+        if gid not in rhos:
+            raise ValueError(f"missing rho for correlation group {gid!r}")
+        rho = float(rhos[gid])
         eff = n_eff(len(present), rho)
         factor = eff / float(len(present))
         for sid in present:

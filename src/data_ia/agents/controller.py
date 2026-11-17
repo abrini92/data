@@ -76,20 +76,33 @@ class ControllerAgent(Agent):
         # Build reliabilities for chi2 from error history (resolved before forecast_at).
         reliabilities = self._reliabilities(context)
 
-        by_leaf: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        # Chi-squared groups by (sub-question, field), not sub-question alone.
+        by_leaf_field: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 
         for obs in observations:
+            field_name = obs.get("extracted_field") or "probability"
+            # Per-observation schema when field differs from the default probability.
+            obs_schema = schema
+            if field_name != schema.field_name:
+                obs_schema = ExtractionSchema(
+                    field_name=field_name,
+                    value_min=0.0,
+                    value_max=1.0,
+                    value_type="probability",
+                    expected_unit=schema.expected_unit,
+                )
             extracted = ExtractedObservation(
                 source_id=obs["source_id"],
-                field_name=obs.get("extracted_field") or "probability",
+                field_name=field_name,
                 value=obs.get("extracted_value"),
                 unit=obs.get("unit"),
                 published_at=obs.get("published_at") or obs.get("collected_at"),
                 source_passage=obs.get("source_passage") or obs.get("raw_doc"),
+                sub_question_id=obs.get("sub_question_id"),
             )
             result = validate_schema_and_range(
                 extracted,
-                schema,
+                obs_schema,
                 require_extraction_fields=require_fields,
             )
             updated = dict(obs)
@@ -97,6 +110,7 @@ class ControllerAgent(Agent):
             updated["unit"] = extracted.unit
             updated["source_passage"] = extracted.source_passage
             updated["data_label"] = normalize_label(obs.get("data_label"))
+            updated["extracted_field"] = field_name
 
             if not result.accepted:
                 updated["status"] = result.action
@@ -123,9 +137,9 @@ class ControllerAgent(Agent):
 
             updated["extracted_value"] = result.cleaned_value
             updated["status"] = "pending_chi2"
-            by_leaf[updated["sub_question_id"]].append(updated)
+            by_leaf_field[(updated["sub_question_id"], field_name)].append(updated)
 
-        for _leaf_id, group in by_leaf.items():
+        for (_leaf_id, _field), group in by_leaf_field.items():
             values = [float(o["extracted_value"]) for o in group]
             rels: list[SourceReliability] = []
             for o in group:

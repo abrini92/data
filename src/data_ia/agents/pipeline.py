@@ -378,7 +378,10 @@ def _error_history_before_forecast(
     session: Session,
     forecast_at: datetime,
 ) -> dict[str, list[tuple[float, float]]]:
-    """Source errors only from questions resolved before forecast_at."""
+    """Source errors only from questions resolved strictly before forecast_at.
+
+    Rows without a resolution date are excluded (no look-ahead in backtests).
+    """
     history: dict[str, list[tuple[float, float]]] = {}
     rows = (
         session.query(SourceError, ResolvedQuestion)
@@ -386,13 +389,53 @@ def _error_history_before_forecast(
         .all()
     )
     for err, resolved in rows:
-        if resolved is not None and resolved.resolved_on is not None:
-            try:
-                assert_resolution_before_forecast(resolved.resolved_on, forecast_at)
-            except LookAheadError:
-                continue
+        if resolved is None or resolved.resolved_on is None:
+            continue
+        try:
+            assert_resolution_before_forecast(resolved.resolved_on, forecast_at)
+        except LookAheadError:
+            continue
         history.setdefault(err.source_id, []).append((err.z, err.x))
     return history
+
+
+def _forecast_day(forecast_at: datetime | date) -> date:
+    if isinstance(forecast_at, datetime):
+        if forecast_at.tzinfo is not None:
+            return forecast_at.astimezone(timezone.utc).date()
+        return forecast_at.date()
+    return forecast_at
+
+
+def leaf_history_before(
+    estimates: list[tuple[str, date, float]],
+    forecast_at: datetime | date,
+) -> dict[str, list[float]]:
+    """Sort by as_of and keep only rows with as_of strictly earlier than forecast day.
+
+    ``estimates`` is a list of (sub_question_id, as_of, estimate). Same-day rows
+    (as_of == forecast day) are excluded.
+    """
+    t = _forecast_day(forecast_at)
+    ordered = sorted(
+        ((sid, as_of, est) for sid, as_of, est in estimates if as_of < t),
+        key=lambda row: (row[0], row[1]),
+    )
+    history: dict[str, list[float]] = {}
+    for sid, _as_of, est in ordered:
+        history.setdefault(sid, []).append(float(est))
+    return history
+
+
+def _leaf_history_before_forecast(
+    session: Session,
+    forecast_at: datetime | date,
+) -> dict[str, list[float]]:
+    rows = session.query(SubQuestionEstimate).all()
+    return leaf_history_before(
+        [(est.sub_question_id, est.as_of, float(est.estimate)) for est in rows],
+        forecast_at,
+    )
 
 
 def run_offline_cycle(
@@ -435,9 +478,7 @@ def run_offline_cycle(
             seed_resolved_and_errors(session, resolved_path)
             error_history = _error_history_before_forecast(session, now)
 
-        leaf_history: dict[str, list[float]] = {}
-        for est in session.query(SubQuestionEstimate).all():
-            leaf_history.setdefault(est.sub_question_id, []).append(est.estimate)
+        leaf_history = _leaf_history_before_forecast(session, now)
 
         cycle = run_agents(
             seed,

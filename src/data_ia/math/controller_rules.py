@@ -6,6 +6,7 @@ chi-squared consistency check using source reliability (bias, variance).
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
@@ -58,6 +59,7 @@ class ExtractedObservation:
     source_passage: str | None = None
     raw_text: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+    sub_question_id: str | None = None
 
 
 def validate_schema_and_range(
@@ -278,10 +280,12 @@ def validate_extraction_batch(
     chi2_alpha: float = 0.01,
     reliabilities: Mapping[str, SourceReliability] | None = None,
 ) -> dict[str, ValidationResult]:
-    """Validate each observation, then optional chi2 across accepted values."""
+    """Validate each observation, then optional chi2 per (sub-question, field)."""
     results: dict[str, ValidationResult] = {}
-    accepted_vals: list[float] = []
-    accepted_rels: list[SourceReliability] = []
+    # Group accepted values by (sub_question_id, field_name) — not by sub-question alone.
+    groups: dict[tuple[str, str], list[tuple[float, SourceReliability | None]]] = (
+        defaultdict(list)
+    )
 
     for i, obs in enumerate(observations):
         key = f"{obs.source_id}:{obs.field_name}:{i}"
@@ -302,17 +306,27 @@ def validate_extraction_batch(
         result = validate_schema_and_range(obs, schema)
         results[key] = result
         if result.accepted and result.cleaned_value is not None:
-            accepted_vals.append(result.cleaned_value)
+            leaf = obs.sub_question_id or "__default__"
+            rel = None
             if reliabilities and obs.source_id in reliabilities:
-                accepted_rels.append(reliabilities[obs.source_id])
+                rel = reliabilities[obs.source_id]
+            groups[(leaf, obs.field_name)].append((result.cleaned_value, rel))
 
-    if run_chi2 and accepted_vals:
-        if len(accepted_rels) == len(accepted_vals) and accepted_rels:
-            chi = chi_squared_consistency(
-                accepted_vals, reliabilities=accepted_rels, alpha=chi2_alpha
-            )
-        else:
-            chi = chi_squared_consistency(accepted_vals, alpha=chi2_alpha)
-        results["__chi2__"] = chi
+    if run_chi2:
+        for (leaf, field), items in groups.items():
+            vals = [v for v, _ in items]
+            rels = [r for _, r in items]
+            if not vals:
+                continue
+            chi_key = f"__chi2__:{leaf}:{field}"
+            if all(r is not None for r in rels) and rels:
+                chi = chi_squared_consistency(
+                    vals,
+                    reliabilities=[r for r in rels if r is not None],
+                    alpha=chi2_alpha,
+                )
+            else:
+                chi = chi_squared_consistency(vals, alpha=chi2_alpha)
+            results[chi_key] = chi
 
     return results

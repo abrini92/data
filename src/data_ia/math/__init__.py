@@ -1,7 +1,14 @@
 """Reproducible maths: source reliability, fusion, aggregation, scoring."""
 
-from data_ia.math.aggregation import AggregationResult, evaluate_taxonomy, logit, sigmoid
+from data_ia.math.aggregation import (
+    AggregationResult,
+    evaluate_taxonomy,
+    logit,
+    sigmoid,
+    taxonomy_leaf_ids,
+)
 from data_ia.math.brier import BrierReport, ResolvedForecast, brier_score, evaluate_proof
+from data_ia.math.constants import PROB_EPS
 from data_ia.math.controller_rules import (
     ExtractedObservation,
     ExtractionSchema,
@@ -32,6 +39,7 @@ __all__ = [
     "ExtractedObservation",
     "ExtractionSchema",
     "FusionResult",
+    "PROB_EPS",
     "ResolvedForecast",
     "SourceEstimate",
     "SourceReliability",
@@ -49,6 +57,7 @@ __all__ = [
     "precision_weight",
     "shrink_toward_prior",
     "sigmoid",
+    "taxonomy_leaf_ids",
     "validate_extraction_batch",
     "validate_schema_and_range",
 ]

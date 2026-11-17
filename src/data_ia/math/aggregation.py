@@ -18,11 +18,11 @@ from typing import Any, Mapping
 
 import numpy as np
 
-_EPS = 1e-12
+from data_ia.math.constants import PROB_EPS
 
 
 def logit(p: float) -> float:
-    p = float(np.clip(p, _EPS, 1.0 - _EPS))
+    p = float(np.clip(p, PROB_EPS, 1.0 - PROB_EPS))
     return float(np.log(p / (1.0 - p)))
 
 
@@ -127,8 +127,8 @@ def evaluate_taxonomy(
         base = clipped[lid]
         hi = dict(clipped)
         lo = dict(clipped)
-        hi[lid] = float(np.clip(base + sensitivity_eps, _EPS, 1.0 - _EPS))
-        lo[lid] = float(np.clip(base - sensitivity_eps, _EPS, 1.0 - _EPS))
+        hi[lid] = float(np.clip(base + sensitivity_eps, PROB_EPS, 1.0 - PROB_EPS))
+        lo[lid] = float(np.clip(base - sensitivity_eps, PROB_EPS, 1.0 - PROB_EPS))
         p_hi_val = _eval_only(taxonomy, hi, root_id)
         p_lo_val = _eval_only(taxonomy, lo, root_id)
         denom = hi[lid] - lo[lid]
@@ -196,3 +196,34 @@ def _infer_root(taxonomy: Mapping[str, Any]) -> str:
             f"cannot infer unique root (found {roots!r}); pass root= explicitly"
         )
     return roots[0]
+
+
+def taxonomy_leaf_ids(
+    taxonomy: Mapping[str, Any],
+    *,
+    root: str | None = None,
+) -> list[str]:
+    """Return leaf node ids reachable from the taxonomy root (deterministic order)."""
+    if not taxonomy:
+        return []
+    root_id = root or _infer_root(taxonomy)
+    leaves: list[str] = []
+    seen: set[str] = set()
+
+    def walk(node_id: str) -> None:
+        if node_id in seen:
+            return
+        seen.add(node_id)
+        node = taxonomy.get(node_id)
+        if node is None:
+            leaves.append(node_id)
+            return
+        ntype = node.get("type", "leaf")
+        if ntype == "leaf":
+            leaves.append(node_id)
+            return
+        for child in node.get("children") or []:
+            walk(child["id"])
+
+    walk(root_id)
+    return leaves
