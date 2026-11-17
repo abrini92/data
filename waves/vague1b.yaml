@@ -1,0 +1,35 @@
+# Data IA - Proof questions, wave 1b (FROZEN)
+# Owner: Data IA · Produit. Do not edit: any change = new wave with new hash.
+wave: "1b"
+frozen_at: "2026-11-18T02:31:52+03:00"
+timezone: "Asia/Riyadh"
+target_question: "Will Saudi real non-oil activities grow by at least 4.5% in 2027, according to GASTAT's first estimate of 2027 annual real GDP?"
+target_resolution_note: "first estimate = GASTAT Q4 2027 flash estimate"
+rules: "identical to wave 1 rules (vague1.yaml, SHA-256 36d214bbd1c34077753808e92152f636f49b0f78b025840311d56fa98fe52311)"
+threshold_sources_file: "/workspace/data-ia/seuils_produit_P6_P17_calendriers.md (Data IA · Sources, 2026-11-18 02:30 Asia/Riyadh); raw copies in /workspace/data-ia/raw/"
+correlation_groups:
+  G_OIL: [P6]          # with wave 1 P5: same series (OPEC MOMR secondary sources), consecutive months
+  G_FISCAL_M2: [P17]
+questions:
+  - id: P6
+    text: "Will OPEC's MOMR show Saudi Arabia's Dec 2026 crude oil production (secondary sources), at first publication, at or above 9.705 mb/d?"
+    driver: M1
+    series: "OPEC MOMR, Saudi Arabia crude oil production based on secondary sources, monthly level (tb/d), first publication (same series as wave 1 P5)"
+    comparator: ">="
+    threshold: 9.705
+    threshold_unit: "mb/d (= 9,705 tb/d)"
+    threshold_anchor: "3Q25 Saudi Arabia average, Table 5-7 'DoC crude oil production based on secondary sources, tb/d', OPEC MOMR Oct 2025 (first publication), printed p.53, https://www.opec.org/assets/assetdb/momr-october-2025-1.pdf"
+    threshold_choice: "first publication (9,705) chosen over later revision (9,704, MOMR May-Jun 2026) for vintage consistency: the resolution value is also a first publication"
+    deadline: "2027-01-25"
+    resolution_source: "OPEC MOMR, Jan 2027 edition"
+  - id: P17
+    text: "Will the approved FY2027 state budget put total expenditure above SAR 1,392 bn, the FY2027 figure in the Ministry of Finance Pre-Budget Statement?"
+    driver: M2
+    series: "Ministry of Finance, FY2027 total expenditure (SAR bn), approved budget as first announced"
+    comparator: ">"
+    threshold: 1392
+    threshold_unit: "SAR bn"
+    threshold_anchor: "Pre-Budget Statement FY2027 (MoF, 30 Sep 2026), p.21 table 'Medium-term Fiscal Projections (SAR bn)', Total Expenditures 2027 = 1,392, https://www.mof.gov.sa/documents/d/group-328541/pre-budget-statement-for-fy-2027"
+    deadline: "2026-12-31"
+    resolution_source: "Ministry of Finance official FY2027 budget statement / announcement"
+    note: "forecast must be frozen >=48h before the budget announcement (expected early Dec 2026 per press [to confirm]); if announced before a forecast is frozen, void"

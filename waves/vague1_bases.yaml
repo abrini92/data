@@ -1,0 +1,158 @@
+# Data IA - Vague 1 : corrélations et bases naïves (Data IA · Modèle) - révision 2 (décisions orchestrateur, COORDINATION v3)
+# Fichier compagnon de vague1.yaml (sha256 36d214bbd1c34077753808e92152f636f49b0f78b025840311d56fa98fe52311), qui n'est pas modifié.
+# Toute modification de ce fichier = nouveau hash dans vague1_bases.sha256. Aucune valeur de base n'est inventée : PENDING_DATA.
+wave: "1"
+revision: 2
+source_wave_file: "vague1.yaml"
+source_wave_sha256: "36d214bbd1c34077753808e92152f636f49b0f78b025840311d56fa98fe52311"
+updated_at: "2026-11-18T02:35:00+03:00"
+author: "Data IA · Modèle"
+correlation:
+  status: CONVENTION   # corrélations cibles des écarts de score (modèle - base), non estimées ; à ré-estimer sur données réalisées
+  method: "R = L L^T + D (modèle à facteurs, PSD vérifié) ; n_eff = n^2 / sum(R_ij), variances égales"
+  script: "/workspace/review/neff_vague1.py"
+  groups_added_off_wave_file:
+    G_SAMA_BULLETIN: [P11, P12]   # décision orchestrateur : même bulletin SAMA, rho = 1 (convention prudente)
+  rho:
+    macro_floor: 0.09        # facteur commun, charge 0.3 sur toutes les questions (driver "all" de P8/P13)
+    G_DEMAND_M3_M4_M5: 0.5   # niveau contre seuil : P1, P3, P11, P12, P14
+    G_PMI: 0.3               # P1-P2 ; P2 = variation m/m
+    G_BCI: 0.3               # P3-P4 ; P2/P4 contre autres membres de la demande : 0.3 ; P2-P4 : 0.198 (implicite)
+    G_IPI: 0.6               # P9-P10
+    G_GDP_P7_vs_P8_P13: 0.3  # inchangé (décision orchestrateur)
+    G_GDP_P8_P13: 1.0        # même publication (flash T4 2026)
+    G_SAMA_BULLETIN: 1.0     # P11-P12
+    G_OIL: null              # P5 seule : plancher macro uniquement
+  n_eff:
+    with_P16:    {n: 15, main: 4.395, rho_x0.6: 5.872, rho_x1.4_cap0.95: 3.512, no_macro: 6.121, P11_P12_not_forced: 4.483}
+    without_P16: {n: 14, main: 4.111, rho_x0.6: 5.474, rho_x1.4_cap0.95: 3.292, no_macro: 5.481, P11_P12_not_forced: 4.199}
+  clusters: [[P1, P2, P3, P4, P11, P12, P14], [P7, P8, P13], [P9, P10], [P5], [P15], [P16]]
+  bootstrap: "wild cluster bootstrap (6 grappes dont 3 singletons)"
+  waves_needed_if_independent:
+    with_P16:    {"30": 7, "50": 12, "100": 23}
+    without_P16: {"30": 8, "50": 13, "100": 25}
+  caveat: "si le facteur macro est commun à toutes les vagues, n_eff total plafonne à 1/0.09 ≈ 11 ; sigma_d inconnu (MDE = 2.80 sigma_d / sqrt(n_eff))"
+  errata_off_hash: "driver de P7 ('calibration') et libellé G_GDP (deux publications) : errata Produit hors hash"
+naive_baselines:
+  P1:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+    freeze_deadline: "2026-12-05T23:59:00+03:00"
+  P2:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P3:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P4:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P5:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P7:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P8:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P9:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P10:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P11:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P12:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P13:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P14:
+    main: "persistance probabiliste v3 (/workspace/review/base-persistance-probabiliste.md)"
+    controls: ["fréquence historique de l évènement, même série, 24-36 obs.", "f = (h+1)/(m+2)", "0.5"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P15:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+  P16:
+    main: "fréquence historique de l évènement sur la même série, 24-36 dernières obs."
+    controls: ["persistance probabiliste v3"]
+    series: "identique à vague1.yaml"
+    data_cutoff: null
+    data_snapshot_sha256: null
+    value: null
+    status: PENDING_DATA
+    note: "conditionnelle (activation_rule de vague1.yaml)"

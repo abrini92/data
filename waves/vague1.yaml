@@ -1,0 +1,160 @@
+# Data IA - Proof questions, wave 1 (FROZEN)
+# Owner: Data IA · Produit. Do not edit: any change = new wave with new hash.
+wave: "1"
+frozen_at: "2026-11-18T02:22:55+03:00"
+timezone: "Asia/Riyadh"
+target_question: "Will Saudi real non-oil activities grow by at least 4.5% in 2027, according to GASTAT's first estimate of 2027 annual real GDP?"
+excluded_to_wave_1b: [P6, P17]   # thresholds not yet read by Sources
+rules:
+  type: binary
+  forecast_freeze: "frozen and timestamped no later than 48h before expected publication"
+  deadline_time: "23:59 Asia/Riyadh on the deadline date"
+  void_rule: "if the resolution publication is not out by the deadline, the question is void"
+  tie_rule: "strict comparator (>): tie = NO; inclusive (>= / <=): tie = YES; values read at the precision printed"
+  previous_point_rule: "comparisons to a previous period use that period as revised in the same publication"
+  fixed_threshold_rule: "fixed numeric thresholds are frozen numbers; the previous period is not re-read"
+  single_series_rule: "the series below is used for both resolution and naive baseline"
+  resolution_sources: "official published documents only (GASTAT, SAMA, OPEC, Riyad Bank, Ministry of Tourism); no SAMA API or internal routes; Argaam/CEIC used only to anchor thresholds"
+  naive_baseline_order: ["historical frequency of the event on the same series, last 24-36 observations", "persistence / status quo (expressed as a probability, method set by Modèle)", "0.5 only as last resort with written per-question justification recorded before freeze"]
+  scoring: "Brier vs naive baseline, counted in effective questions (n_eff): 30 checkpoint, 50 formal conclusion, target 100"
+correlation_groups:
+  G_PMI: [P1, P2]
+  G_BCI: [P3, P4]
+  G_OIL: [P5]
+  G_GDP: [P7, P8, P13]
+  G_IPI: [P9, P10]
+  G_DEMAND_M3_M4_M5: [P1, P2, P3, P4, P11, P12, P14]   # rho [to confirm] by Modèle
+questions:
+  - id: P1
+    text: "Will the Riyad Bank Saudi PMI for Nov 2026 be above 54.0?"
+    driver: M5
+    series: "Riyad Bank Saudi Arabia PMI, headline index, as published (seasonally adjusted by publisher)"
+    comparator: ">"
+    threshold: 54.0
+    threshold_anchor: "Oct 2026 headline PMI, Riyad Bank release https://www.riyadbank.com/documents/20121/8029796/SA_PMI_ENG_2611_PR.pdf/74023353-cf9c-2435-02b6-00a3a48ac22d"
+    deadline: "2026-12-07"
+    resolution_source: "Riyad Bank Saudi PMI press release for Nov 2026"
+  - id: P2
+    text: "Will the Riyad Bank Saudi PMI for Dec 2026 be above the Nov 2026 reading?"
+    driver: M5
+    series: "Riyad Bank Saudi Arabia PMI, headline index, as published (seasonally adjusted by publisher)"
+    comparator: ">"
+    threshold: "Nov 2026 reading as printed in the Dec 2026 release"
+    deadline: "2027-01-08"
+    resolution_source: "Riyad Bank Saudi PMI press release for Dec 2026"
+  - id: P3
+    text: "Will GASTAT's Business Confidence Index for Nov 2026 be at or above 55.5?"
+    driver: M5
+    series: "GASTAT Business Confidence Index, headline, as published"
+    comparator: ">="
+    threshold: 55.5
+    threshold_anchor: "Oct 2026 BCI https://stats.gov.sa/documents/20117/2435267/BCI+Oct+2026+EN.pdf/06bafcef-a346-ef65-d1b3-e0b44e2e3dc7"
+    deadline: "2026-12-15"
+    resolution_source: "GASTAT BCI release for Nov 2026"
+  - id: P4
+    text: "Will GASTAT's BCI for Dec 2026 be above the Nov 2026 reading?"
+    driver: M5
+    series: "GASTAT Business Confidence Index, headline, as published"
+    comparator: ">"
+    threshold: "Nov 2026 reading as printed in the Dec 2026 release"
+    deadline: "2027-01-15"
+    resolution_source: "GASTAT BCI release for Dec 2026"
+  - id: P5
+    text: "Will OPEC's MOMR show Saudi crude production (secondary sources) for Nov 2026 at or above 9.194 mb/d?"
+    driver: M1
+    series: "OPEC MOMR, Saudi Arabia crude oil production based on secondary sources, monthly level (mb/d), first publication"
+    comparator: ">="
+    threshold: 9.194
+    threshold_anchor: "Oct 2026 value, OPEC MOMR Nov 2026 (cited by press) https://publications.opec.org/momr/get"
+    deadline: "2026-12-20"
+    resolution_source: "OPEC MOMR, Dec 2026 edition"
+  - id: P7
+    text: "Will GASTAT's detailed Q3 2026 national accounts show non-oil activities growth (YoY) above the 1.9% flash?"
+    driver: calibration
+    series: "GASTAT real GDP, non-oil activities, YoY growth (%), quarterly"
+    comparator: ">"
+    threshold: 1.9
+    threshold_anchor: "GASTAT GDP flash Q3 2026 https://www.stats.gov.sa/documents/20117/2435267/GDP+Flash+Estimates+Q3-2026+EN.pdf/6f533c39-3bc0-b2a6-8017-5e7c21a6f199"
+    deadline: "2026-12-20"
+    resolution_source: "GASTAT detailed quarterly national accounts Q3 2026"
+  - id: P8
+    text: "Will GASTAT's flash estimate show Q4 2026 non-oil activities growth (YoY) above 1.9%?"
+    driver: all
+    series: "GASTAT real GDP, non-oil activities, YoY growth (%), quarterly"
+    comparator: ">"
+    threshold: 1.9
+    threshold_anchor: "GASTAT GDP flash Q3 2026 (same URL as P7)"
+    deadline: "2027-02-10"
+    resolution_source: "GASTAT GDP flash estimate Q4 2026"
+  - id: P9
+    text: "Will GASTAT's IPI non-oil activities index for Oct 2026 show positive YoY growth?"
+    driver: M6
+    series: "GASTAT Industrial Production Index, non-oil activities, YoY growth (%), monthly"
+    comparator: ">"
+    threshold: 0.0
+    threshold_anchor: "Sep 2026 value +0.1% (Arab News citing GASTAT)"
+    deadline: "2026-12-17"
+    resolution_source: "GASTAT IPI release for Oct 2026"
+  - id: P10
+    text: "Will GASTAT's IPI non-oil activities index for Nov 2026 show positive YoY growth?"
+    driver: M6
+    series: "GASTAT Industrial Production Index, non-oil activities, YoY growth (%), monthly"
+    comparator: ">"
+    threshold: 0.0
+    deadline: "2027-01-15"
+    resolution_source: "GASTAT IPI release for Nov 2026"
+  - id: P11
+    text: "Will SAMA's Monthly Statistical Bulletin show private-sector bank credit growth (YoY) for Nov 2026 at or above 6.2%?"
+    driver: M4
+    series: "SAMA Monthly Statistical Bulletin, bank claims on private sector, YoY growth (%) computed from levels printed in the same bulletin"
+    comparator: ">="
+    threshold: 6.2
+    threshold_anchor: "Sep 2026 YoY computed by The Edge from SAMA bulletin (SAR 3,215bn)"
+    deadline: "2027-01-07"
+    resolution_source: "SAMA Monthly Statistical Bulletin with Nov 2026 data https://www.sama.gov.sa/en-US/Publications/EconomicReports/Pages/MonthlyStatistics.aspx"
+  - id: P12
+    text: "Will SAMA data show mada e-commerce transaction value for Nov 2026 above SAR 37.30bn?"
+    driver: M3
+    series: "SAMA, mada e-commerce transactions, monthly value (SAR bn), raw"
+    comparator: ">"
+    threshold: 37.30
+    threshold_anchor: "Sep 2026 value (CEIC citing SAMA)"
+    deadline: "2027-01-07"
+    resolution_source: "SAMA Monthly Statistical Bulletin with Nov 2026 data"
+  - id: P13
+    text: "Will GASTAT's Q4 2026 flash put 2026 annual non-oil activities growth at or above 1.9%?"
+    driver: all
+    series: "GASTAT real GDP, non-oil activities, annual growth (%), first estimate"
+    comparator: ">="
+    threshold: 1.9
+    threshold_anchor: "Q3 2026 flash YoY non-oil activities (P7 URL)"
+    deadline: "2027-02-10"
+    resolution_source: "GASTAT GDP flash estimate Q4 2026"
+  - id: P14
+    text: "Will the latest SAMA weekly POS report published by 31 Dec 2026 show a 4-week moving average above SAR 13.71bn?"
+    driver: M3
+    series: "SAMA weekly POS transactions, total value (SAR bn), 4-week simple moving average computed from the last 4 weekly totals"
+    comparator: ">"
+    threshold: 13.71
+    threshold_anchor: "4-week average, week of 7 Nov 2026 (Argaam citing SAMA); method to be replicated on SAMA weekly totals"
+    deadline: "2026-12-31"
+    resolution_source: "SAMA weekly POS report https://www.sama.gov.sa/ar-sa/Statistics/Indices/Pages/POS.aspx"
+  - id: P15
+    text: "Will GASTAT's Labour Market Statistics for Q3 2026 show total unemployment at or below 3.0%?"
+    driver: M7
+    series: "GASTAT Labour Force Survey, total unemployment rate (Saudis and non-Saudis), quarterly (%)"
+    comparator: "<="
+    threshold: 3.0
+    threshold_anchor: "Q2 2026 value https://www.stats.gov.sa/documents/20117/2435273/Labor+Market+Statistics-+Q2+2026-EN+%281%29.pdf/6ac2a808-12b0-87f7-8092-9d20f125d30f"
+    deadline: "2027-01-10"
+    resolution_source: "GASTAT Labour Market Statistics Q3 2026"
+  - id: P16
+    status: conditional
+    activation_rule: "active only if the Q3 2026 figure is published before 2027-02-10; otherwise void and excluded from scoring"
+    text: "Will Q3 2026 inbound international tourist numbers be higher YoY?"
+    driver: M8
+    series: "Ministry of Tourism, inbound international tourists, quarterly count, YoY change"
+    comparator: ">"
+    threshold: 0
+    deadline: "2027-02-10"
+    resolution_source: "https://tourism.sa/en/data-insights"

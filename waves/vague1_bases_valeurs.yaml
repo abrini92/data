@@ -1,0 +1,445 @@
+# vague1_bases_valeurs.yaml – v2 – Data IA · Modèle. Ne pas éditer à la main : régénérer avec /workspace/data-ia/bases/freeze.py
+file: vague1_bases_valeurs.yaml
+version: v2
+owner: Data IA · Modèle
+frozen_at: '2026-11-18T02:41:32+03:00'
+timezone: Asia/Riyadh
+wave_file: waves/vague1.yaml
+wave_sha256: 36d214bbd1c34077753808e92152f636f49b0f78b025840311d56fa98fe52311
+merge_note: valeurs à fusionner dans vague1_bases.yaml (édité par un autre agent) ; ce fichier sera refigé avec un nouveau hash à chaque nouvelle valeur (version incrémentée)
+PMI_licence: 'PMI : usage interne, ne pas reproduire dans les rapports (P1, P2 ; propriété S&P Global)'
+mapping_rules:
+  R1: 'seuil = dernière valeur publiée au data_cutoff (P1, P11, P12) : v3 sur les variations à h pas (h = nombre de périodes entre la dernière valeur et la valeur cible ; h=1 → v3 exacte). Strict : 0 =
+    N ; inclusif (>=) : 0 = H.'
+  R2: 'seuil ≠ dernière valeur (P14, P6, et P5 si son seuil n''est plus la dernière valeur au gel) : chaîne à 2 états sur ''évènement satisfait'', mêmes constantes v3 (K ≤ 12, f=(h+1)/(m+2), 4 pseudo-transitions,
+    bornes [0,05 ; 0,95]), matrice élevée à la puissance h.'
+  controle: fréquence historique du même évènement que la base principale (24-36 dernières obs. quand elles existent ; Laplace) ; la fréquence littérale du niveau vs seuil est rapportée en diagnostic quand
+    elle diffère.
+scripts_sha256:
+  /workspace/data-ia/bases/bases_v1.py: 40c6958a2839e86749049bc9ea120a8a6e9b64d601386df3c7bfc8117a85b447
+  /workspace/data-ia/bases/bases_1b.py: e754f5d4048f132a24a6836e47fed2f03254a5b75f568a4ea567b8e46b79172a
+  /workspace/data-ia/bases/neff_v1_1b.py: b6fc1bd54cd664b360e03e28941476902241bbcdfaaab5cdaa0e5bd77da6a2a8
+  /workspace/review/persist_v3.py: f6c5f6d7e42f4c4df457c3b44379d38dd864ffb20230b19b66f82fb0e89ccb4c
+  /workspace/review/neff_vague1.py: 68094cf16d47c27775ee7c3a714691d03f4fb32de89f42cc426291c8e59acb93
+rules: bornes [0,05 ; 0,95] ; aucune donnée publiée après data_cutoff ; recalcul à chaque forecast_at avec le même data_cutoff
+freeze_order:
+- P17
+- P1
+- P7
+- P3
+- P9
+- P5
+- P11
+- P12
+- P14
+- P15
+- P2
+- P4
+- P10
+- P6
+- P8
+- P13
+- P16
+questions:
+  P1:
+    freeze_deadline: 2026-12-01T07:15:00+03:00 (PMI de nov. publié le 3 déc. 07:15 ; règle des 48 h ; remplace le 5 déc. 23:59)
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: 0.3714
+    status: FROZEN
+    data_cutoff: '2026-11-18T02:41:32+03:00'
+    source_sha256: 00c1d2e574b3f66e2ab60020dbdfabbc5273703249fe20256894efe81d2ae15c
+    source: /workspace/data-ia/sources/vague1/P1.csv
+    method_detail:
+      mapping: 'seuil 54.0 = PMI d''oct. 2026 (première publication) : ''Nov > 54.0'' ⇔ hausse stricte vs dernière valeur → v3 telle quelle (H = hausse stricte, zéro = N)'
+      last12_changes:
+        2025-11: -1.7
+        2025-12: -1.1
+        2026-01: -1.1
+        2026-02: -0.2
+        2026-03: -7.3
+        2026-04: 2.7
+        2026-05: 1.3
+        2026-06: 0.5
+        2026-07: -0.2
+        2026-08: 0.7
+        2026-09: 1.5
+        2026-10: -1.3
+      m: 12
+      h: 5
+      f: 0.428571
+      d: N
+      n_d: 6
+      u_d: 2
+      raw: 0.371429
+    control_value: 0.4595
+    control_detail:
+      method: fréquence historique des hausses strictes, 35 dernières variations, Laplace (k+1)/(n+2)
+      k: 16
+      n: 35
+      value: 0.4595
+      raw: 0.4571
+    control_f_v3: 0.4286
+    diagnostic_non_retenu:
+      method: 'fréquence niveau > 54.0 sur les 36 derniers mois (lecture littérale, non retenue : seuil = dernière valeur)'
+      k: 29
+      n: 36
+      value: 0.7895
+    gaps:
+      series: 36 niveaux continus nov. 2023 – oct. 2026, aucun mois manquant
+      releases_missing:
+      - publication de juil. 2025 (août 2025)
+      - publication de janv. 2026 (févr. 2026)
+      - publication de mai 2026 (juin 2026)
+      treatment: valeur du mois reprise de la publication suivante ('previous month as printed') ; 0 écart entre première publication et réimpression sur les 32 recoupements → impact nul
+      fetch_failures: 4 URL pmi.spglobal.com en HTTP 403 (manifest Sources)
+    note: aucune observation postérieure au 2026-11-03 (publication d'oct.) ; la publication de nov. (≈3 déc.) est la résolution
+    licence: 'PMI : usage interne, ne pas reproduire dans les rapports'
+  P2:
+    freeze_deadline: janvier 2027 [date exacte à fixer par Produit]
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+    licence: 'PMI : usage interne, ne pas reproduire dans les rapports'
+  P3:
+    freeze_deadline: '2026-12-07T09:00:00+03:00'
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P4:
+    freeze_deadline: janvier 2027 [date exacte à fixer par Produit]
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P5:
+    freeze_deadline: 2026-12-08T09:00:00+03:00 (retenu, plus strict ; MOMR le 14 déc. → la règle des 48 h donnerait le 12 déc. ; Produit indique le 11 déc.)
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P7:
+    freeze_deadline: '2026-12-06T09:00:00+03:00'
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: 0.75
+    status: FROZEN
+    data_cutoff: '2026-11-18T02:41:32+03:00'
+    source_sha256: 50c52cbc61b27b7c960fe5dc42c64c194bade1765880eca7e5a139aed1e6dda5
+    source: /workspace/data-ia/sources/vague1/P7_pairs.csv
+    method_detail:
+      method: fréquence historique 'détaillé > flash' (révision strictement positive, égalité = NON), Laplace (k+1)/(n+2), n < 24
+      k: 5
+      n: 6
+      value: 0.75
+      raw: 0.8333
+    control_value: 0.75
+    control_detail:
+      method: persistance v3 sur le signe des révisions successives
+      value: 0.75
+      kind: f
+      detail:
+        m: 6
+        h: 5
+        f: 0.75
+    pairs:
+      2024Q4:
+        flash: 4.6
+        detailed: 4.7
+        revision: 0.1
+        event: true
+      2025Q1:
+        flash: 4.2
+        detailed: 4.9
+        revision: 0.7
+        event: true
+      2025Q2:
+        flash: 4.7
+        detailed: 4.6
+        revision: -0.1
+        event: false
+      2025Q4:
+        flash: 4.1
+        detailed: 4.3
+        revision: 0.2
+        event: true
+      2026Q1:
+        flash: 2.8
+        detailed: 2.9
+        revision: 0.1
+        event: true
+      2026Q2:
+        flash: 0.6
+        detailed: 0.9
+        revision: 0.3
+        event: true
+    quarters_incomplete:
+    - 2023Q4
+    - 2024Q1
+    - 2024Q2
+    - 2024Q3
+    - 2025Q3
+    - 2026Q3
+    source_series: /workspace/data-ia/sources/vague1/P7.csv
+    source_series_sha256: e08512d6e55b3864a667d98358d397121592d0b159b15f41674c8146c86a7a40
+    justification: 'n = 6 paires flash/détaillé complètes (< 24) : la règle 24-36 ne peut pas s''appliquer ; fréquence lissée Laplace (k+1)/(n+2) ; égalité = NON (comparateur strict). Le gel au 6 déc. 09:00
+      utilisera les mêmes données sauf nouvelle paire (aucune attendue avant le 8 déc.).'
+    gaps: flash manquant pour 2023Q4-2024Q3 et 2025Q3, détaillé manquant pour 2024Q1 ; 2026Q3 = la question elle-même
+  P8:
+    freeze_deadline: avant 2027-02-10 [heure à fixer]
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P9:
+    freeze_deadline: '2026-12-08T09:00:00+03:00'
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P10:
+    freeze_deadline: 2027-01-08T23:59:00+03:00 (avant l IPI de nov.)
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P11:
+    freeze_deadline: '2026-12-29T09:00:00+03:00'
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: 0.1429
+    status: FROZEN_PROVISIONAL
+    data_cutoff: '2026-11-18T02:41:32+03:00'
+    source_sha256: c3420e11741d948c6b248bda1a1d73541948f57c460dd8ac67b03fe61900b51d
+    source: /workspace/data-ia/sources/vague1/P11.csv
+    method_detail:
+      method: 'persistance v3, règle R1 (seuil 6.2 = dernière valeur, sept. 2026) : variations à 2 mois du YoY arrondi au dixième, égalité = OUI (>=)'
+      value: 0.1429
+      kind: markov
+      detail:
+        m: 12
+        h: 1
+        f: 0.142857
+        d: H
+        n_d: 0
+        u_d: 0
+        raw: 0.142857
+      last12_changes:
+      - -1.3
+      - -2.2
+      - -1.6
+      - -1.0
+      - -1.4
+      - -2.3
+      - -1.7
+      - -0.8
+      - -0.6
+      - -0.9
+      - -0.6
+      - 0.4
+    control_value: 0.5135
+    control_detail:
+      method: fréquence historique de l'évènement R1 (Δ2 YoY arrondi >= 0), 35 dernières variations (≤ 36), Laplace
+      k: 18
+      n: 35
+      value: 0.5135
+    sensitivity_R2:
+      method: chaîne à états 'YoY >= 6.2', P^h, h=2
+      value: 0.8494
+      detail:
+        m: 13
+        h: 11
+        f: 0.8
+        d: 1
+        p_1_si_0: 0.7
+        p_1_si_1: 0.871429
+        horizon: 2
+        raw: 0.849388
+    diagnostic_level:
+      method: fréquence niveau 'YoY >= 6.2', 36 derniers mois, Laplace (lecture littérale, dégénérée sur série en tendance)
+      k: 34
+      n: 36
+      value: 0.9211
+    threshold_check:
+      level_2026_09_SARbn: 3215.3
+      yoy_2026_09: 6.202
+      rounded: 6.2
+      threshold: 6.2
+      match: true
+    yoy_last13:
+      2025-09: 12.98
+      2025-10: 12.0
+      2025-11: 10.8
+      2025-12: 10.43
+      2026-01: 9.78
+      2026-02: 9.01
+      2026-03: 7.49
+      2026-04: 7.31
+      2026-05: 6.66
+      2026-06: 6.67
+      2026-07: 5.8
+      2026-08: 6.12
+      2026-09: 6.2
+    note: 'seuil reproduit (YoY sept. 2026 calculé = 6,202 % → 6,2, niveau 3 215,3 Md SAR) : P11 NON annulée. Base à recalculer au forecast_at (≤ 29 déc. 09:00) avec le bulletin d''oct. (29 nov.) → nouvelle
+      version. ALERTE : forte sensibilité à la règle de correspondance (R1 0,14 / R2 0,85 / fréquence niveau 0,92 / fréquence Δ2 0,51) à arbitrer par l''orchestrateur.'
+  P12:
+    freeze_deadline: '2026-12-29T09:00:00+03:00'
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: 0.7959
+    status: FROZEN_PROVISIONAL
+    data_cutoff: '2026-11-18T02:41:32+03:00'
+    source_sha256: 088a93d05822f105caace2dd9eff937a40c8fc7b554430413fcab3933c966694
+    source: /workspace/data-ia/sources/vague1/P12.csv
+    method_detail:
+      method: 'persistance v3, règle R1 (seuil 37.30 = dernière valeur, sept. 2026) : variations à 2 mois, strict (0 = N) ; série brute, saisonnalité non traitée (signalé)'
+      value: 0.7959
+      kind: markov
+      detail:
+        m: 12
+        h: 8
+        f: 0.642857
+        d: N
+        n_d: 3
+        u_d: 3
+        raw: 0.795918
+      last12_changes:
+      - 1.42
+      - -0.01
+      - 0.38
+      - 3.48
+      - -0.7
+      - 2.77
+      - 2.75
+      - -0.7
+      - 0.46
+      - 2.97
+      - 3.32
+      - -0.33
+    control_value: 0.7368
+    control_detail:
+      method: fréquence historique de l'évènement R1 (Δ2 valeur > 0), 36 dernières variations (≤ 36), Laplace
+      k: 27
+      n: 36
+      value: 0.7368
+    sensitivity_R2:
+      method: chaîne à états 'valeur > 37.30', P^h, h=2
+      value: 0.1027
+      detail:
+        m: 13
+        h: 1
+        f: 0.133333
+        d: 0
+        p_1_si_0: 0.102222
+        p_1_si_1: 0.106667
+        horizon: 2
+        raw: 0.102677
+    diagnostic_level:
+      method: fréquence niveau 'valeur > 37.30', 36 derniers mois, Laplace (lecture littérale, dégénérée sur série en tendance)
+      k: 1
+      n: 36
+      value: 0.0526
+    threshold_check:
+      value_2026_09: 37.3
+      threshold: 37.3
+      match: true
+    december_duplicates:
+      2023-12:
+      - 156.91
+      - 13.63
+      2024-12:
+      - 197.42
+      - 19.37
+      2025-12:
+      - 325.2
+      - 31.12
+    last13:
+      2025-09: 29.12
+      2025-10: 30.74
+      2025-11: 29.11
+      2025-12: 31.12
+      2026-01: 32.59
+      2026-02: 30.42
+      2026-03: 35.36
+      2026-04: 33.17
+      2026-05: 34.66
+      2026-06: 33.63
+      2026-07: 37.63
+      2026-08: 36.95
+      2026-09: 37.3
+    note: 'seuil reproduit (37,30 Md SAR, sept. 2026) : P12 OK. Anomalie Sources : les 3 lignes de déc. (2023-2025) existent en double, la 1re = total annuel (≈ 10x) étiquetée ''raw, monthly'' → la valeur
+      mensuelle est retenue. Série brute (saisonnalité non traitée). Recalcul au forecast_at avec le bulletin d''oct. ALERTE sensibilité : R1 0,80 / R2 0,10 / fréquence Δ2 0,74 / fréquence niveau 0,05.'
+  P13:
+    freeze_deadline: avant 2027-02-10 [heure à fixer]
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P14:
+    freeze_deadline: '2026-12-29T09:00:00+03:00'
+    main: persistance v3
+    control: fréquence historique (même série, 24-36 obs.)
+    value: 0.6919
+    status: FROZEN_PROVISIONAL
+    data_cutoff: '2026-11-18T02:41:32+03:00'
+    source_sha256: 381c5aed3f9ebd51c270e9554e4fd1d24d25c627277bf35489f76ed213951c67
+    source: /workspace/data-ia/sources/vague1/P14.csv
+    method_detail:
+      mapping: 'seuil 13.71 = MM4 au 7 nov., pas la dernière valeur, horizon ≈ 6 semaines → chaîne v3 à 2 états sur ''MM4 > 13.71'' (mêmes constantes K, f, 4 pseudo-transitions, bornes), matrice élevée
+        à la puissance h=6 [hypothèse : dernier rapport au 31 déc. = semaine au 26 déc.]'
+      m: 10
+      h: 7
+      f: 0.666667
+      d: 1
+      p_1_si_0: 0.52381
+      p_1_si_1: 0.766667
+      horizon: 6
+      raw: 0.691887
+    control_value: 0.6667
+    control_detail:
+      method: fréquence 'MM4 > 13.71', Laplace, n < 24 (seulement 10 MM4 disponibles)
+      k: 7
+      n: 10
+      value: 0.6667
+    threshold_check:
+      ma4_week_7nov: 13.7064
+      rounded: 13.71
+      threshold: 13.71
+      match: true
+      verdict: méthode MM4 simple des 4 derniers totaux hebdomadaires SAMA (Table 1, Total) redonne 13.71 (13.7064) → seuil Argaam reproduit, P14 NON annulée
+    gaps: 'seulement 13 semaines (16 août – 14 nov. 2026) → 10 MM4 : < 24 obs., contrôle fréquence hors règle 24-36 ; MM4 chevauchantes (autocorrélation). Demander à Sources ≥ 36 semaines avant le 29 déc.
+      ; base à recalculer au forecast_at avec le même data_cutoff (nouvelle version du fichier).'
+  P15:
+    freeze_deadline: '2026-12-29T09:00:00+03:00'
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null
+  P16:
+    freeze_deadline: avant 2027-02-10 [heure à fixer]
+    main: fréquence historique (même série, 24-36 dernières obs.)
+    control: persistance v3
+    value: null
+    status: PENDING_DATA
+    data_cutoff: null
+    source_sha256: null

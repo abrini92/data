@@ -1,0 +1,57 @@
+# vague1b_bases.yaml – v2 – Data IA · Modèle. Ne pas éditer à la main : régénérer avec /workspace/data-ia/bases/freeze.py
+file: vague1b_bases.yaml
+version: v2
+owner: Data IA · Modèle
+frozen_at: '2026-11-18T02:41:32+03:00'
+timezone: Asia/Riyadh
+wave_file: waves/vague1b.yaml
+wave_sha256: 95c1f3754a6825d05eca45c4d1730abdadf92a3cc1543f09518ffe464d4877f0
+scripts_sha256:
+  /workspace/data-ia/bases/bases_v1.py: 40c6958a2839e86749049bc9ea120a8a6e9b64d601386df3c7bfc8117a85b447
+  /workspace/data-ia/bases/bases_1b.py: e754f5d4048f132a24a6836e47fed2f03254a5b75f568a4ea567b8e46b79172a
+  /workspace/data-ia/bases/neff_v1_1b.py: b6fc1bd54cd664b360e03e28941476902241bbcdfaaab5cdaa0e5bd77da6a2a8
+  /workspace/review/persist_v3.py: f6c5f6d7e42f4c4df457c3b44379d38dd864ffb20230b19b66f82fb0e89ccb4c
+  /workspace/review/neff_vague1.py: 68094cf16d47c27775ee7c3a714691d03f4fb32de89f42cc426291c8e59acb93
+questions:
+  P17:
+    freeze_deadline: immédiat ; au plus tard 48 h avant l'annonce du budget FY2027 (début déc. 2026 [à confirmer])
+    main: fréquence historique 'dépenses du budget approuvé > dépenses du Pre-Budget Statement pour le même exercice', Laplace (k+1)/(n+2), égalité = NON (comparateur strict)
+    control: aucune (statu quo non défini pour un évènement annuel unique) ; 0,5 rapporté pour mémoire
+    source: /workspace/data-ia/sources/vague1b/P17.csv
+    source_sha256: null
+    status: PENDING_DATA
+    value: null
+    data_cutoff: null
+    reason: PENDING_DATA (fichier absent)
+  P6:
+    freeze_deadline: avant le MOMR de janvier 2027 [date à confirmer]
+    main: persistance v3 adaptée (comme P5), états 'niveau ≥ 9.705 Mb/j' (seuil ≠ dernière valeur), matrice v3 à la puissance h = mois jusqu'à déc. 2026
+    control: fréquence 'niveau ≥ 9.705' sur la même série, 24-36 derniers mois
+    source: /workspace/data-ia/sources/vague1b/P6.csv
+    source_sha256: null
+    status: PENDING_DATA
+    value: null
+    data_cutoff: null
+    reason: PENDING_DATA (fichier absent)
+P17_justification: 'Les PBS du MoF n''existent que depuis peu d''exercices : n < 24, la règle des 24-36 obs. ne peut pas s''appliquer. On garde la fréquence (base défendable, pas 0,5) avec le lissage de
+  Laplace (k+1)/(n+2), prior uniforme Beta(1,1), qui évite 0 ou 1 sur petit n. Égalité = NON car le comparateur est strict. Exercice 2027 exclu de l''historique. MANUAL de Modèle : non faite (hors mandat
+  de ce fichier).'
+correlation_addendum:
+  P5_P6:
+    rho: 0.6
+    status: CONVENTION
+    reason: même série OPEC MOMR sources secondaires, mois proches (nov. et déc. 2026), comme P9–P10 (rho_IPI = 0,6) ; facteur 'oil' partagé, PSD par construction
+  P17: facteur macro seul (c0 = 0,09) ; aucun autre membre dans G_FISCAL_M2
+  P11_P12: rho = 1 (décision orchestrateur, inchangée)
+  n_eff:
+    vague1_seule_15: 4.395
+    vague1_plus_1b_17: 4.833
+    vague1_plus_1b_16_sans_P16: 4.578
+    sensibilite_17:
+      principal rho_OIL=0,6: 4.833
+      rho_OIL=0,4: 4.866
+      rho_OIL=0,8: 4.801
+      x0.6: 6.527
+      x1.4: 3.837
+      vague 1 seule (référence): 4.395
+  script: /workspace/data-ia/bases/neff_v1_1b.py (réutilise build() de /workspace/review/neff_vague1.py)
