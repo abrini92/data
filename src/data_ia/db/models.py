@@ -1,7 +1,8 @@
-"""SQLAlchemy ORM models for Data IA v1.
+"""SQLAlchemy ORM models for Data IA.
 
 Tables: questions/sub-question tree, sources, observations (with provenance),
-resolved questions, source error history, daily answer snapshots.
+resolved questions, source error history, daily answer snapshots, and the
+append-only forecast_registry.
 """
 
 from __future__ import annotations
@@ -20,8 +21,11 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     func,
+    text,
 )
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -34,8 +38,14 @@ class Question(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    horizon: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    horizon: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     region: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    zone: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    target_variable: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    unit: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    resolution_source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    resolution_rule: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="active")
     illustrative: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -44,6 +54,7 @@ class Question(Base):
 
     nodes: Mapped[list[SubQuestion]] = relationship(back_populates="question")
     snapshots: Mapped[list[DailySnapshot]] = relationship(back_populates="question")
+    forecasts: Mapped[list[ForecastRegistry]] = relationship(back_populates="question")
 
 
 class SubQuestion(Base):
@@ -94,15 +105,21 @@ class Observation(Base):
     raw_doc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     extracted_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     extracted_field: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    unit: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    source_passage: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     collected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
+    )
+    published_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
     )
     content_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     extractor_version: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="raw")
     # raw | accepted | rejected | quarantined
     rejection_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_label: Mapped[str] = mapped_column(String(32), default="SYNTHETIC")
     meta: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
     source: Mapped[Source] = relationship(back_populates="observations")
@@ -113,11 +130,15 @@ class ResolvedQuestion(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
-    probability: Mapped[float] = mapped_column(Float, nullable=False)
+    # Hand-written YAML probabilities are NOT used for engine proof scoring.
+    # Kept optional for legacy synthetic seed loading only.
+    probability: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     outcome: Mapped[int] = mapped_column(Integer, nullable=False)
     resolved_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     label: Mapped[str] = mapped_column(String(64), default="ILLUSTRATIVE/SYNTHETIC")
-    baseline_probability: Mapped[float] = mapped_column(Float, default=0.5)
+    data_label: Mapped[str] = mapped_column(String(32), default="SYNTHETIC")
+    question_class: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    baseline_probability: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     meta: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
 
 
@@ -134,6 +155,7 @@ class SourceError(Base):
     recorded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    data_label: Mapped[str] = mapped_column(String(32), default="SYNTHETIC")
 
     source: Mapped[Source] = relationship(back_populates="errors")
 
@@ -158,10 +180,9 @@ class SubQuestionEstimate(Base):
 
 
 class DailySnapshot(Base):
+    """Convenience latest-view rows. Audit trail is forecast_registry (append-only)."""
+
     __tablename__ = "daily_answer_snapshots"
-    __table_args__ = (
-        UniqueConstraint("question_id", "as_of", name="uq_snapshot_day"),
-    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     question_id: Mapped[str] = mapped_column(ForeignKey("questions.id"), index=True)
@@ -175,8 +196,91 @@ class DailySnapshot(Base):
         JSON, nullable=True
     )
     disclaimer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_label: Mapped[str] = mapped_column(String(32), default="SYNTHETIC")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
 
     question: Mapped[Question] = relationship(back_populates="snapshots")
+
+
+class ForecastRegistry(Base):
+    """Append-only frozen forecast rows. No UPDATE/DELETE (enforced by DB triggers)."""
+
+    __tablename__ = "forecast_registry"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    question_id: Mapped[str] = mapped_column(ForeignKey("questions.id"), index=True)
+    forecast_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    data_cutoff: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    git_commit: Mapped[str] = mapped_column(String(64), nullable=False)
+    config_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    extractor_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    observation_ids: Mapped[list[Any]] = mapped_column(JSON, nullable=False)
+    probability: Mapped[float] = mapped_column(Float, nullable=False)
+    interval_low: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    interval_high: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    data_label: Mapped[str] = mapped_column(String(32), nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    question: Mapped[Question] = relationship(back_populates="forecasts")
+
+
+def install_forecast_registry_triggers(engine: Engine) -> None:
+    """Reject UPDATE/DELETE on forecast_registry (SQLite + Postgres)."""
+    dialect = engine.dialect.name
+    if dialect == "sqlite":
+        stmts = [
+            """
+            CREATE TRIGGER IF NOT EXISTS forecast_registry_no_update
+            BEFORE UPDATE ON forecast_registry
+            BEGIN
+              SELECT RAISE(ABORT, 'forecast_registry is append-only: UPDATE rejected');
+            END;
+            """,
+            """
+            CREATE TRIGGER IF NOT EXISTS forecast_registry_no_delete
+            BEFORE DELETE ON forecast_registry
+            BEGIN
+              SELECT RAISE(ABORT, 'forecast_registry is append-only: DELETE rejected');
+            END;
+            """,
+        ]
+    elif dialect in {"postgresql", "postgres"}:
+        stmts = [
+            """
+            CREATE OR REPLACE FUNCTION forecast_registry_reject_mutation()
+            RETURNS trigger AS $$
+            BEGIN
+              RAISE EXCEPTION 'forecast_registry is append-only: % rejected', TG_OP;
+            END;
+            $$ LANGUAGE plpgsql;
+            """,
+            """
+            DROP TRIGGER IF EXISTS forecast_registry_no_update ON forecast_registry;
+            CREATE TRIGGER forecast_registry_no_update
+            BEFORE UPDATE ON forecast_registry
+            FOR EACH ROW EXECUTE FUNCTION forecast_registry_reject_mutation();
+            """,
+            """
+            DROP TRIGGER IF EXISTS forecast_registry_no_delete ON forecast_registry;
+            CREATE TRIGGER forecast_registry_no_delete
+            BEFORE DELETE ON forecast_registry
+            FOR EACH ROW EXECUTE FUNCTION forecast_registry_reject_mutation();
+            """,
+        ]
+    else:
+        return
+
+    with engine.begin() as conn:
+        for stmt in stmts:
+            conn.execute(text(stmt))
+
+
+@event.listens_for(Base.metadata, "after_create")
+def _install_triggers_after_create(target, connection, **kw):  # type: ignore[no-untyped-def]
+    # Installed explicitly via install_forecast_registry_triggers in init_db.
+    _ = (target, connection, kw)

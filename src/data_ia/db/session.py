@@ -13,7 +13,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from data_ia.config import REPO_ROOT, get_settings
-from data_ia.db.models import Base
+from data_ia.db.models import Base, install_forecast_registry_triggers
 
 _engine: Engine | None = None
 _SessionLocal: sessionmaker[Session] | None = None
@@ -96,6 +96,7 @@ def init_db(*, fallback_sqlite: bool = False) -> Engine:
     """Create all tables. Use SQLite when Docker/Postgres is unavailable."""
     engine = get_engine(fallback_sqlite=fallback_sqlite)
     Base.metadata.create_all(bind=engine)
+    install_forecast_registry_triggers(engine)
     return engine
 
 
@@ -121,6 +122,7 @@ def try_init_db() -> tuple[Engine, str]:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         Base.metadata.create_all(bind=engine)
+        install_forecast_registry_triggers(engine)
         return engine, "postgres"
     except Exception:
         reset_engine()
