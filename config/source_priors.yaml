@@ -1,5 +1,6 @@
 # Class priors for source reliability shrinkage (lambda_N = N/(N+N0)).
 # ILLUSTRATIVE defaults — not calibrated on real CST data.
+# Bias aligned on NIG b0 = 0 (CONVENTION – PROVISIONAL, not calibrated).
 
 regulator:
   bias: 0.0
@@ -7,7 +8,7 @@ regulator:
   n0: 5.0
 
 press:
-  bias: 0.05
+  bias: 0.0
   variance: 0.12
   n0: 5.0
 
@@ -32,7 +33,7 @@ national_stats:
   n0: 5.0
 
 social:
-  bias: 0.10
+  bias: 0.0
   variance: 0.25
   n0: 8.0
 

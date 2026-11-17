@@ -1,13 +1,31 @@
-# PROVISIONAL – pending validation by the model owner.
-# Maps reliability_prior score in [0, 1] → prior variance for the source model.
-# Variance is strictly decreasing in the score (higher reliability → tighter prior).
-# Prior bias defaults to 0. These values are NOT calibrated.
+# CONVENTION – PROVISIONAL, not calibrated.
+# Normal-inverse-gamma (NIG) prior per source for bias/variance (Pass 3b).
+# The NIG Bayesian update itself is Pass 4 — this file is config + loader only.
+# sigma2_ref is a placeholder scale; it has NOT been measured on real errors.
 
-status: "PROVISIONAL – pending validation by the model owner"
+status: "CONVENTION – PROVISIONAL, not calibrated"
+convention_note: >
+  NIG hyperparameters replace the single shrinkage N0 from Pass 3.
+  s0² = k(class) · sigma2_ref. Do not present these as calibrated.
+
+# NIG hyperparameters (Murphy NIχ² / NIG form): bias ~ N(b0, σ²/κ0), σ² ~ Inv-χ²(ν0, s0²)
+nig:
+  b0: 0.0
+  kappa0: 2.0
+  nu0: 4.0          # must be > 2
+  sigma2_ref: 0.10  # NOT YET MEASURED — provisional reference scale
+
+# Class multipliers for s0² = k(class) · sigma2_ref.
+# Must be monotone non-decreasing A ≤ B ≤ C ≤ D (loader rejects otherwise).
+k_by_class:
+  A: 0.5
+  B: 1.0
+  C: 1.25
+  D: 2.0
+
+# Optional score→variance table still used by reliability_prior interpolation
+# until Pass 4 wires NIG fully. PROVISIONAL.
 prior_bias: 0.0
-n0: 5.0
-
-# Monotonic table: score ascending, variance descending.
 score_to_variance:
   - score: 0.00
     variance: 0.40

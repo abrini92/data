@@ -49,9 +49,16 @@ Scores probabilities **from the forecast registry** (engine output), never hand-
 
 ### Priors mapping (PROVISIONAL)
 
-`reliability_prior` ∈ [0,1] in `config/sources.yaml` maps to prior variance (monotonic decreasing) and prior bias (0 by default) via `config/prior_mapping.yaml`, plus shrinkage constant `N0`.
+Pass 3b replaces the single shrinkage `N0` with a **normal-inverse-gamma (NIG)** prior per source in `config/prior_mapping.yaml`:
 
-> **PROVISIONAL – pending validation by the model owner.** Do not present these values as calibrated.
+- `b0 = 0`, `kappa0 = 2`, `nu0 = 4` (must be `> 2`)
+- `s0² = k(class) · sigma2_ref` with class multipliers `k`: A 0.5 / B 1 / C 1.25 / D 2
+- Loader rejects a non-monotone `k` table and `nu0 <= 2`
+- `config/source_priors.yaml` class biases are aligned on `b0 = 0`
+
+The NIG Bayesian update itself is **Pass 4** — config and loader only for now. `sigma2_ref` is a placeholder scale (**not measured**). Optional `score_to_variance` still interpolates `reliability_prior` ∈ [0,1] until Pass 4.
+
+> **CONVENTION – PROVISIONAL, not calibrated.** Do not present these values as calibrated.
 
 ### Sources (verified 18 Nov 2026)
 
