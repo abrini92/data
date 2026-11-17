@@ -11,6 +11,7 @@ import yaml
 from data_ia.agents.base import Agent, AgentResult
 from data_ia.config import get_settings
 from data_ia.math.aggregation import evaluate_taxonomy
+from data_ia.math.labels import MixedLabelError, assert_homogeneous_labels, normalize_label
 from data_ia.math.sources import (
     ClassPrior,
     ErrorObservation,
@@ -39,6 +40,20 @@ class StrategistAgent(Agent):
                 ok=False,
                 checks=["has_accepted"],
                 errors=["no accepted observations to fuse"],
+                failure_action=self.on_failure,
+            )
+
+        try:
+            batch_label = assert_homogeneous_labels(
+                [normalize_label(o.get("data_label")) for o in accepted],
+                context="strategist_fusion",
+            )
+        except MixedLabelError as exc:
+            return AgentResult(
+                agent=self.name,
+                ok=False,
+                checks=["has_accepted", "labels"],
+                errors=[str(exc)],
                 failure_action=self.on_failure,
             )
 
@@ -142,11 +157,14 @@ class StrategistAgent(Agent):
 
         ok = not errors
         qid = ((context.get("seed") or {}).get("question") or {}).get("id", "")
-        disclaimer = (
-            "ILLUSTRATIVE offline cycle — stub LLM extractions and seed tree; "
-            "not a real forecast."
-            + (f" Question id: {qid}." if qid else "")
-        )
+        if batch_label == "SYNTHETIC":
+            disclaimer = (
+                "ILLUSTRATIVE/SYNTHETIC offline cycle — stub LLM extractions and seed tree; "
+                "not a real forecast."
+                + (f" Question id: {qid}." if qid else "")
+            )
+        else:
+            disclaimer = f"REAL-labelled forecast." + (f" Question id: {qid}." if qid else "")
         return AgentResult(
             agent=self.name,
             ok=ok,
