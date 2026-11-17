@@ -272,8 +272,11 @@ def seed_resolved_and_errors(session: Session, resolved_path: Path) -> None:
                 )
             )
     # Seed illustrative errors once (avoid duplicating on every cycle).
+    # Skip rows whose source_id is not present (seed-specific catalogues).
     if session.query(SourceError).count() == 0:
         for err in data.get("source_errors") or []:
+            if session.get(Source, err["source_id"]) is None:
+                continue
             session.add(
                 SourceError(
                     source_id=err["source_id"],

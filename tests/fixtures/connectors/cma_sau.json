@@ -1,0 +1,7 @@
+{
+  "series": [
+    {"indicator": "licensed_funds", "country": "SAU", "date": "2024", "value": 280, "unit": "count"},
+    {"indicator": "licensed_funds", "country": "SAU", "date": "2025", "value": 295, "unit": "count"}
+  ],
+  "note": "ILLUSTRATIVE/SYNTHETIC CMA-shaped fixture for offline tests"
+}

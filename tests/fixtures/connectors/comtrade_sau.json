@@ -1,0 +1,8 @@
+{
+  "series": [
+    {"indicator": "import_value", "country": "SAU", "date": "2021", "value": 152000000000, "unit": "USD"},
+    {"indicator": "import_value", "country": "SAU", "date": "2022", "value": 178000000000, "unit": "USD"},
+    {"indicator": "import_value", "country": "SAU", "date": "2023", "value": 185000000000, "unit": "USD"}
+  ],
+  "note": "ILLUSTRATIVE/SYNTHETIC Comtrade-shaped fixture for offline tests"
+}

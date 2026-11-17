@@ -1,0 +1,8 @@
+{
+  "series": [
+    {"indicator": "crude_production", "country": "SAU", "date": "2022", "value": 10.5, "unit": "mb/d"},
+    {"indicator": "crude_production", "country": "SAU", "date": "2023", "value": 9.7, "unit": "mb/d"},
+    {"indicator": "crude_production", "country": "SAU", "date": "2024", "value": 9.0, "unit": "mb/d"}
+  ],
+  "note": "ILLUSTRATIVE/SYNTHETIC EIA-shaped fixture; live path needs EIA_API_KEY"
+}

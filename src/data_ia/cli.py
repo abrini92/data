@@ -1,4 +1,4 @@
-"""CLI entrypoints: offline cycle, Brier proof, agent catalog, dashboard hint."""
+"""CLI entrypoints: offline cycle, Brier proof, collect, agent catalog, dashboard hint."""
 
 from __future__ import annotations
 
@@ -75,6 +75,69 @@ def cmd_dashboard(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_collect(args: argparse.Namespace) -> int:
+    """Fetch one or all registered sources (fixtures unless COLLECT_REAL_SOURCES)."""
+    from data_ia.connectors.registry import get_connector, list_sources, save_raw_cache
+
+    settings = get_settings()
+    real = bool(settings.collect_real_sources) or bool(args.real)
+
+    if args.all:
+        names = [s["name"] for s in list_sources(include_optional=bool(args.include_optional))]
+    elif args.source:
+        names = [args.source]
+    else:
+        print("Specify --source <name> or --all", file=sys.stderr)
+        return 2
+
+    summaries: list[dict] = []
+    exit_code = 0
+    for name in names:
+        try:
+            connector = get_connector(name)
+        except KeyError as exc:
+            print(str(exc), file=sys.stderr)
+            exit_code = 1
+            continue
+
+        payload = connector.collect(real=real)
+        cache_path = None
+        if payload.ok or payload.raw is not None or payload.raw_text:
+            cache_path = str(save_raw_cache(name, payload))
+
+        summary = {
+            "source": name,
+            "ok": payload.ok,
+            "fetch_mode": payload.provenance.fetch_mode,
+            "url": payload.provenance.url,
+            "content_hash": payload.provenance.content_hash,
+            "connector_version": payload.provenance.connector_version,
+            "n_records": len(payload.records),
+            "controller_accepted": sum(
+                1 for c in payload.controller_results if c.get("accepted")
+            ),
+            "skipped_reason": payload.skipped_reason,
+            "errors": payload.errors,
+            "cache_path": cache_path,
+            "real": real,
+        }
+        summaries.append(summary)
+        if args.source and not payload.ok:
+            exit_code = 1
+        elif args.all and not payload.ok and payload.provenance.fetch_mode != "skipped":
+            exit_code = 1
+
+    print(json.dumps({"real": real, "results": summaries}, indent=2, ensure_ascii=False))
+    return exit_code
+
+
+def cmd_sources(_: argparse.Namespace) -> int:
+    from data_ia.connectors.registry import list_sources
+
+    print(json.dumps(list_sources(include_optional=True), indent=2, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="data-ia", description=f"Data IA v{__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -83,10 +146,7 @@ def main(argv: list[str] | None = None) -> int:
     p_cycle.set_defaults(func=cmd_cycle)
 
     p_brier = sub.add_parser("brier", help="Brier proof vs naive baseline (synthetic set)")
-    p_brier.add_argument(
-        "--path",
-        help="YAML of resolved questions (ILLUSTRATIVE/SYNTHETIC)",
-    )
+    p_brier.add_argument("--path", help="YAML of resolved questions (ILLUSTRATIVE/SYNTHETIC)")
     p_brier.set_defaults(func=cmd_brier)
 
     p_agents = sub.add_parser("agents", help="Describe the six agents")
@@ -94,6 +154,27 @@ def main(argv: list[str] | None = None) -> int:
 
     p_dash = sub.add_parser("dashboard", help="Print Streamlit launch command")
     p_dash.set_defaults(func=cmd_dashboard)
+
+    p_collect = sub.add_parser(
+        "collect",
+        help="Collect from a registered source (fixtures unless COLLECT_REAL_SOURCES)",
+    )
+    p_collect.add_argument("--source", help="Source name from config/sources.yaml")
+    p_collect.add_argument("--all", action="store_true", help="Collect every non-optional source")
+    p_collect.add_argument(
+        "--include-optional",
+        action="store_true",
+        help="With --all, also include optional sources (e.g. sama)",
+    )
+    p_collect.add_argument(
+        "--real",
+        action="store_true",
+        help="Force live HTTP even if COLLECT_REAL_SOURCES is false",
+    )
+    p_collect.set_defaults(func=cmd_collect)
+
+    p_sources = sub.add_parser("sources", help="List sources.yaml registry")
+    p_sources.set_defaults(func=cmd_sources)
 
     args = parser.parse_args(argv)
     return int(args.func(args))

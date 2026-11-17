@@ -1,0 +1,7 @@
+{
+  "series": [
+    {"indicator": "policy_rate", "country": "SAU", "date": "2024", "value": 5.5, "unit": "percent"},
+    {"indicator": "policy_rate", "country": "SAU", "date": "2025", "value": 5.0, "unit": "percent"}
+  ],
+  "note": "ILLUSTRATIVE/SYNTHETIC optional SAMA fixture"
+}

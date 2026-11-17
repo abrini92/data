@@ -14,7 +14,18 @@ class ScoutAgent(Agent):
     checks = "URL parseable; source_class in allow-list; no duplicate ids"
     on_failure = "Drop invalid candidates; continue with remaining; flag coverage gap"
 
-    ALLOWED_CLASSES = {"open", "agreement", "internal", "press", "social", "regulator"}
+    ALLOWED_CLASSES = {
+        "open",
+        "agreement",
+        "internal",
+        "press",
+        "social",
+        "regulator",
+        "multilateral",
+        "energy",
+        "national_stats",
+        "central_bank",
+    }
 
     def run(self, context: dict[str, Any]) -> AgentResult:
         seed = context.get("seed") or {}

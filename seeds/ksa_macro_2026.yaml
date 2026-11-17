@@ -1,0 +1,121 @@
+# ILLUSTRATIVE default seed (Pass 2) — not a real forecast.
+# Short-horizon KSA macro question using World Bank / IMF / Comtrade / EIA-shaped sources.
+
+question:
+  id: ksa_internet_penetration_next_wb_year
+  text: >-
+    ILLUSTRATIVE — Probability that the next published World Bank observation of
+    Saudi Arabia individuals-using-the-internet (% of population, IT.NET.USER.ZS)
+    remains at or above 95%.
+  horizon: "2027-12-31"
+  region: KSA
+  illustrative: true
+
+sub_questions:
+  - id: root
+    parent_id: null
+    text: Final aggregated probability (taxonomy root)
+    node_type: weighted_logit
+    weight: 1.0
+    illustrative: true
+    sort_order: 0
+
+  - id: digital_connectivity
+    parent_id: root
+    text: Digital connectivity remains high
+    node_type: weighted_logit
+    weight: 0.45
+    illustrative: true
+    sort_order: 1
+
+  - id: internet_penetration_high
+    parent_id: digital_connectivity
+    text: ILLUSTRATIVE — Internet penetration stays ≥ 95%
+    node_type: leaf
+    weight: 0.60
+    illustrative: true
+    sort_order: 2
+
+  - id: digital_infra_stable
+    parent_id: digital_connectivity
+    text: ILLUSTRATIVE — Broader digital infrastructure signals stay supportive
+    node_type: leaf
+    weight: 0.40
+    illustrative: true
+    sort_order: 3
+
+  - id: macro_momentum
+    parent_id: root
+    text: Macro / energy backdrop does not force a digital retreat
+    node_type: weighted_logit
+    weight: 0.35
+    illustrative: true
+    sort_order: 4
+
+  - id: growth_not_collapsing
+    parent_id: macro_momentum
+    text: ILLUSTRATIVE — Real GDP growth path not in deep contraction
+    node_type: leaf
+    weight: 0.55
+    illustrative: true
+    sort_order: 5
+
+  - id: energy_export_capacity
+    parent_id: macro_momentum
+    text: ILLUSTRATIVE — Energy export capacity remains material
+    node_type: leaf
+    weight: 0.45
+    illustrative: true
+    sort_order: 6
+
+  - id: external_trade
+    parent_id: root
+    text: ILLUSTRATIVE — Trade flows remain consistent with an open digital economy
+    node_type: leaf
+    weight: 0.20
+    illustrative: true
+    sort_order: 7
+
+sources:
+  - id: worldbank
+    name: World Bank Indicators (SAU)
+    url: https://api.worldbank.org/v2/country/SAU/indicator/IT.NET.USER.ZS
+    source_class: multilateral
+    publisher: World Bank
+    freshness_days: 365
+    usage_rights: open_data
+    stub_snippet: ILLUSTRATIVE — internet users % of population series for SAU.
+
+  - id: imf
+    name: IMF WEO (SAU real GDP growth)
+    url: https://api.imf.org/external/sdmx/3.0/
+    source_class: multilateral
+    publisher: IMF
+    freshness_days: 180
+    usage_rights: imf_data_terms
+    stub_snippet: ILLUSTRATIVE — WEO NGDP_RPCH for SAU.
+
+  - id: comtrade
+    name: UN Comtrade preview (SAU)
+    url: https://comtradeapi.un.org/public/v1/
+    source_class: multilateral
+    publisher: UN Comtrade
+    freshness_days: 365
+    usage_rights: public_preview
+    stub_snippet: ILLUSTRATIVE — merchandise trade preview for SAU.
+
+  - id: eia
+    name: EIA energy (SAU)
+    url: https://api.eia.gov/v2/
+    source_class: energy
+    publisher: U.S. EIA
+    freshness_days: 90
+    usage_rights: public_domain
+    stub_snippet: ILLUSTRATIVE — KSA energy series (live needs EIA_API_KEY).
+
+# Maps to fuse_observations(correlation_groups=..., group_rho=...)
+correlation_groups:
+  multilaterals: [worldbank, imf, comtrade]
+group_rho:
+  multilaterals: 0.35
+

@@ -1,43 +1,42 @@
-# Aggregation taxonomy for the Starlink KSA seed (ILLUSTRATIVE).
-# Formula: root uses weighted_logit over three branches (slide 7 style).
+# Default taxonomy — ILLUSTRATIVE KSA macro / connectivity seed.
 
 root:
   type: weighted_logit
   children:
-    - id: regulatory_track
+    - id: digital_connectivity
       weight: 0.45
-    - id: commercial_readiness
-      weight: 0.30
-    - id: geopolitical_fit
-      weight: 0.25
+    - id: macro_momentum
+      weight: 0.35
+    - id: external_trade
+      weight: 0.20
 
-regulatory_track:
+digital_connectivity:
   type: weighted_logit
   children:
-    - id: cst_process_active
+    - id: internet_penetration_high
+      weight: 0.60
+    - id: digital_infra_stable
+      weight: 0.40
+
+macro_momentum:
+  type: weighted_logit
+  children:
+    - id: growth_not_collapsing
       weight: 0.55
-    - id: spectrum_clearance
+    - id: energy_export_capacity
       weight: 0.45
 
-commercial_readiness:
-  type: weighted_logit
-  children:
-    - id: local_partner_signal
-      weight: 0.50
-    - id: public_service_intent
-      weight: 0.50
-
-geopolitical_fit:
+external_trade:
   type: leaf
 
-cst_process_active:
+internet_penetration_high:
   type: leaf
 
-spectrum_clearance:
+digital_infra_stable:
   type: leaf
 
-local_partner_signal:
+growth_not_collapsing:
   type: leaf
 
-public_service_intent:
+energy_export_capacity:
   type: leaf

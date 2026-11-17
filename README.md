@@ -1,14 +1,14 @@
-# Data IA — version 1
+# Data IA — version 1 (+ Pass 2 connectors)
 
 Internal **stc** decision engine: a question is broken into a tree of sub-questions, each with daily estimates, fused into one final probability.
 
-**First seed question (ILLUSTRATIVE):** probability that CST approves Starlink’s residential service, open to the public, in KSA before 31 Dec 2027.
+**Default seed (ILLUSTRATIVE):** short-horizon KSA macro question — probability that Saudi Arabia real GDP growth for 2026 is ≥ 3.5% (`seeds/ksa_macro_2026.yaml`). Starlink remains an optional example only.
 
 Principle: LLMs extract under control; reproducible models calculate. No LLM output enters the maths without schema and range validation.
 
-> The technical deck `docs/Data-IA-Technical-Deck-v3.pptx` was not present in the repo when v1 was built. Deliverables follow `BRIEF.md` (slides 1–14). Slide 15 vision is out of scope.
+> Specs: `BRIEF.md` (v1) and `BRIEF-2.md` (real sources / n_eff). Technical deck pptx was not in-repo at build time.
 
-## Quick start (Windows-friendly, no Docker required)
+## Quick start
 
 ```powershell
 python -m venv .venv
@@ -17,121 +17,93 @@ pip install -e ".[dev]"
 copy .env.example .env
 python -m data_ia.cli cycle
 python -m data_ia.cli brier
+python -m data_ia.cli collect --source worldbank
 streamlit run src/data_ia/dashboard/app.py
 pytest
 ```
 
-One-shot offline cycle (same as `data-ia cycle`):
+Or: `powershell -ExecutionPolicy Bypass -File scripts/dev_start.ps1`
+
+Default DB is **SQLite** (`data/dataia.db`). Optional: `docker compose up -d` + Postgres URL in `.env`.
+
+Real HTTP collection is **off** by default (`COLLECT_REAL_SOURCES=false`). Connectors use recorded fixtures offline.
+
+## Pass 2 — real source connectors
+
+Registry: `config/sources.yaml`. CLI:
 
 ```powershell
-python scripts/run_offline_cycle.py
+python -m data_ia.cli sources
+python -m data_ia.cli collect --source worldbank          # fixture by default
+python -m data_ia.cli collect --source worldbank --real   # live HTTP
+$env:COLLECT_REAL_SOURCES="true"; python -m data_ia.cli collect --all
 ```
 
-Default storage is **SQLite** (`data/dataia.db`). Tests and the offline cycle run fully without Docker.
+| Source | Access | Key | License / notes |
+| --- | --- | --- | --- |
+| `worldbank` | REST JSON Indicators API (SAU) | none | World Bank open data |
+| `imf` | SDMX 3.0 WEO | none | IMF data terms |
+| `comtrade` | Public preview API | none | Rate-limited preview |
+| `gastat` | stats.gov.sa developer | `GASTAT_API_KEY` | Skip if key absent |
+| `cma` | opendataapi.cma.gov.sa | none* | CMA open data terms |
+| `eia` | api.eia.gov | `EIA_API_KEY` | U.S. public domain; skip if absent |
+| `sama` | optional | — | Skipped live (no scraping) |
 
-### Optional: PostgreSQL + pgvector via Docker
+\*CMA paths vary; live failure falls back to fixture.
 
-```powershell
-docker compose up -d
-# set DATABASE_URL=postgresql+psycopg://dataia:dataia@localhost:5432/dataia in .env
-python -m data_ia.cli cycle
+**Do not scrape** Umm Al-Qura, KAPSARC, Ookla, Saudi Exchange, or Etimad salary APIs (terms / PDPL). Respect robots.txt and rate limits; User-Agent is `DataIA/0.2`.
+
+### API keys
+
+Put keys only in `.env` (never commit):
+
 ```
-
-If Postgres is configured but unreachable, the pipeline **falls back to SQLite** automatically (`db_mode: sqlite-fallback`).
-
-Real HTTP collection is **off** by default (`COLLECT_REAL_SOURCES=false`). The Collector uses stub documents + the deterministic stub LLM so the cycle stays offline. Set the flag to `true` only when you intentionally want live fetches of configured public URLs.
+EIA_API_KEY=
+GASTAT_API_KEY=
+```
 
 ## Architecture
 
 ```
 Orchestrator → Scout → Collector → Controller → Investigator → Strategist
-     │            │         │            │             │             │
-  question     sources   raw docs +   accept /      surprise     fuse +
-  tree         catalogue extractions  quarantine    scores       aggregate
 ```
 
 | Agent | Produces | Checks | On failure |
 | --- | --- | --- | --- |
-| Orchestrator | Verified question + sub-question tree | ids, leaf text, structure | Block question; do not schedule Scout |
-| Scout | Source catalogue candidates | URL scheme, class allow-list, unique ids | Drop bad candidates; flag coverage gap |
-| Collector | Raw docs + extractions with provenance (URL, timestamp, hash, extractor version) | hash / timestamp / version present | Retry with stub body; mark failed if empty |
-| Controller | Accepted / rejected / quarantined observations | schema, range, χ² consistency | Reject schema/range; quarantine χ²; exclude from maths |
-| Investigator | Per-leaf surprise = −log P(x_t \| past) | finite surprise; threshold alerts | Note insufficient history; do not block Strategist |
-| Strategist | Final P, interval, source weights, sensitivities | P∈[0,1]; interval ordered; fused leaves | Withhold publish; keep last good snapshot |
+| Orchestrator | Question + sub-question tree | ids, leaf text, structure | Block; do not schedule Scout |
+| Scout | Source catalogue | URL, class, unique ids | Drop bad candidates |
+| Collector | Raw docs + extractions + provenance | hash, timestamp, version | Retry stub; mark failed |
+| Controller | Accept / reject / quarantine | schema, range, χ² | Exclude from maths |
+| Investigator | Surprise −log P(x_t \| past) | finite; threshold alerts | Note; do not block Strategist |
+| Strategist | Final P, interval, weights, dP/dx | bounds; fused leaves | Withhold publish |
 
-Scheduler: APScheduler cron job (`SCHEDULER_ENABLED=true`) or one-shot via CLI.
+## Formula → code
 
-## Formula → code mapping
-
-| Formula (BRIEF / slide 5–9) | Code |
+| Formula | Code |
 | --- | --- |
-| \(z_s = x + b_s + \varepsilon_s\) | `data_ia.math.sources` |
-| \(b_s = \mathrm{mean}(z_{s,i}-x_i)\) | `estimate_source_reliability` |
-| \(\sigma_s^2 = \mathrm{mean}((z_{s,i}-b_s-x_i)^2)\) | same |
-| \(\tau_s = 1/\sigma_s^2\) | `SourceReliability.precision` |
-| \(\lambda_N = N/(N+N_0)\) shrinkage to class prior | `shrink_toward_prior` |
-| Precision-weighted fusion | `fuse_observations` |
-| Logit aggregation + taxonomy YAML | `data_ia.math.aggregation.evaluate_taxonomy` + `config/taxonomy.yaml` |
-| Sensitivities \(dP/dx_k\) | finite differences in `evaluate_taxonomy` |
-| Surprise \(-\log P(x_t\mid\mathrm{past})\) | `data_ia.math.surprise.gaussian_surprise` |
-| Brier vs naive baseline | `data_ia.math.brier` + `data-ia brier` |
+| Source bias / variance / τ / shrinkage | `data_ia.math.sources` |
+| Fusion | `fuse_observations` |
+| \(n_{\mathrm{eff}}=n/(1+(n-1)\rho)\) | `n_eff` + group scales in `fuse_observations` |
+| Logit taxonomy + sensitivities | `data_ia.math.aggregation` |
+| Brier vs baseline | `data_ia.math.brier` + `data-ia brier` |
 
-### Choices where the deck is silent
+Correlation groups / ρ: `config/sources.yaml` and seed `correlation_groups` / `group_rho`.
 
-- **Weighted-logit weights** are normalised to sum to 1 on each node (taxonomy may list unnormalised weights).
-- **Variance floor** \(10^{-12}\) so perfect tiny samples do not explode precision.
-- **Predictive surprise** uses a Gaussian \(N(\bar x, s^2)\) on the leaf history.
-- **Interval** on final P: first-order delta-method style from leaf variances and FD sensitivities (approximate 95% band).
-- **χ² check** treats cross-source readings on one leaf as a consistency probe vs their mean (continuous proxy).
-- **PyMC** is optional (`pip install -e ".[bayes]"`); v1 maths use NumPy/SciPy only.
-- **Default DB** is SQLite for Windows hosts without Docker.
+## Seeds
 
-## Seeds & synthetic proof
+- **Default:** `seeds/ksa_macro_2026.yaml` (ILLUSTRATIVE KSA macro)
+- Optional: `seeds/starlink_ksa.yaml` + `TAXONOMY_PATH=config/taxonomy_starlink.yaml`
+- Brier set: `seeds/synthetic_resolved.yaml` — **never present as real**
 
-- `seeds/starlink_ksa.yaml` — ILLUSTRATIVE question tree + public source URLs (CST, SSA, press).
-- `seeds/synthetic_resolved.yaml` — ILLUSTRATIVE/SYNTHETIC short-horizon resolved set for Brier. **Never present as real.**
+## Privacy / legal
 
-```powershell
-python -m data_ia.cli brier
-```
-
-## Dashboard
-
-After a cycle:
-
-```powershell
-streamlit run src/data_ia/dashboard/app.py
-```
-
-Shows the tree, leaf estimate history, final probability with interval, source weights, and sensitivities.
-
-## Tests & CI
-
-```powershell
-pytest
-```
-
-Postgres-only test is marked `@pytest.mark.postgres` and skips when Docker/Postgres is unavailable. GitHub Actions runs SQLite + stub LLM on Python 3.12.
-
-## Privacy
-
-No telemetry. No external calls except configured sources (when `COLLECT_REAL_SOURCES=true`) and a configured LLM provider. Stub mode makes zero network calls for extraction. Align deployment with Saudi PDPL for production hosting.
-
-## Next steps (toward slide 14 target stack)
-
-- Wire a real LLM provider behind the same interface with strict JSON schema validation.
-- Enable live collectors with robots/ToS-aware fetching and Iceberg-style history when the platform grows.
-- Calibrate source class priors on a larger resolved set; replace FD sensitivities with analytic forms where taxonomy allows.
-- Optional PyMC hierarchical source model; stronger χ² / replication-aware dependence.
-- Auth’d dashboard and multi-question workspace.
+No telemetry. Offline tests make no network calls. Live mode only hits configured APIs when `COLLECT_REAL_SOURCES=true` or `--real`. Align production hosting with Saudi PDPL.
 
 ## Repo layout
 
 ```
-src/data_ia/     package (math, agents, db, llm, dashboard, scheduler, cli)
-config/          taxonomy + source class priors
-seeds/           Starlink seed + synthetic resolved set
-tests/           pytest (maths, controller, offline cycle)
-scripts/         offline cycle helper
-docker-compose.yml   pgvector Postgres
+src/data_ia/connectors/   World Bank, IMF, Comtrade, GASTAT, CMA, EIA, SAMA
+config/sources.yaml       registry + correlation groups
+tests/fixtures/connectors recorded HTTP fixtures
+seeds/ksa_macro_2026.yaml default ILLUSTRATIVE question
 ```

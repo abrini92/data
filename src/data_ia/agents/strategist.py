@@ -141,9 +141,11 @@ class StrategistAgent(Agent):
             errors.append("no leaf probabilities")
 
         ok = not errors
+        qid = ((context.get("seed") or {}).get("question") or {}).get("id", "")
         disclaimer = (
             "ILLUSTRATIVE offline cycle — stub LLM extractions and seed tree; "
-            "not a real forecast of CST/Starlink outcomes."
+            "not a real forecast."
+            + (f" Question id: {qid}." if qid else "")
         )
         return AgentResult(
             agent=self.name,

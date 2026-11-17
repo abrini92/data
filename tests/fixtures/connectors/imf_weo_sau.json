@@ -1,0 +1,10 @@
+{
+  "series": [
+    {"indicator": "NGDP_RPCH", "country": "SAU", "date": "2021", "value": 3.2, "unit": "percent"},
+    {"indicator": "NGDP_RPCH", "country": "SAU", "date": "2022", "value": 8.7, "unit": "percent"},
+    {"indicator": "NGDP_RPCH", "country": "SAU", "date": "2023", "value": -0.8, "unit": "percent"},
+    {"indicator": "NGDP_RPCH", "country": "SAU", "date": "2024", "value": 1.3, "unit": "percent"},
+    {"indicator": "NGDP_RPCH", "country": "SAU", "date": "2025", "value": 3.0, "unit": "percent"}
+  ],
+  "note": "ILLUSTRATIVE/SYNTHETIC fixture shaped for offline tests — not an official IMF extract"
+}

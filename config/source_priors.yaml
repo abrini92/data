@@ -16,6 +16,21 @@ open:
   variance: 0.10
   n0: 5.0
 
+multilateral:
+  bias: 0.0
+  variance: 0.08
+  n0: 5.0
+
+energy:
+  bias: 0.0
+  variance: 0.10
+  n0: 5.0
+
+national_stats:
+  bias: 0.0
+  variance: 0.06
+  n0: 5.0
+
 social:
   bias: 0.10
   variance: 0.25

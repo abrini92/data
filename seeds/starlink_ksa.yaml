@@ -1,5 +1,9 @@
-# ILLUSTRATIVE seed for Data IA v1 — not a real forecast.
+# OPTIONAL EXAMPLE seed (not the default) — ILLUSTRATIVE, not a real forecast.
 # Question: CST / Starlink residential service in KSA before 31 Dec 2027.
+# Run with:
+#   SEED_PATH=seeds/starlink_ksa.yaml
+#   TAXONOMY_PATH=config/taxonomy_starlink.yaml
+
 
 question:
   id: starlink_ksa_residential_2027

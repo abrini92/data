@@ -51,7 +51,33 @@ resolved_questions:
     baseline_probability: 0.5
 
 # Paired (z, x) errors for source reliability demos — ILLUSTRATIVE only.
+# Includes ids for the default macro seed and the optional Starlink example.
+# Rows whose source_id is absent from the active seed are skipped at insert time.
 source_errors:
+  - source_id: worldbank
+    resolved_id: synth_reg_consult_q1
+    z: 0.80
+    x: 1.0
+  - source_id: worldbank
+    resolved_id: synth_trial_license_q3
+    z: 0.50
+    x: 1.0
+  - source_id: imf
+    resolved_id: synth_partner_mou_q2
+    z: 0.55
+    x: 0.0
+  - source_id: imf
+    resolved_id: synth_press_deny_q4
+    z: 0.30
+    x: 0.0
+  - source_id: comtrade
+    resolved_id: synth_spectrum_note_q5
+    z: 0.70
+    x: 0.0
+  - source_id: eia
+    resolved_id: synth_ceo_hint_q6
+    z: 0.45
+    x: 1.0
   - source_id: cst_gov_sa
     resolved_id: synth_reg_consult_q1
     z: 0.80

@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = Field(default=False, alias="SCHEDULER_ENABLED")
     dashboard_port: int = Field(default=8501, alias="DASHBOARD_PORT")
     seed_path: str = Field(
-        default=str(REPO_ROOT / "seeds" / "starlink_ksa.yaml"),
+        default=str(REPO_ROOT / "seeds" / "ksa_macro_illustrative.yaml"),
         alias="SEED_PATH",
     )
     taxonomy_path: str = Field(
@@ -43,6 +43,13 @@ class Settings(BaseSettings):
         default=str(REPO_ROOT / "config" / "source_priors.yaml"),
         alias="SOURCE_PRIORS_PATH",
     )
+    sources_registry_path: str = Field(
+        default=str(REPO_ROOT / "config" / "sources.yaml"),
+        alias="SOURCES_REGISTRY_PATH",
+    )
+    eia_api_key: str = Field(default="", alias="EIA_API_KEY")
+    gastat_api_key: str = Field(default="", alias="GASTAT_API_KEY")
+    sama_api_key: str = Field(default="", alias="SAMA_API_KEY")
 
 
 @lru_cache

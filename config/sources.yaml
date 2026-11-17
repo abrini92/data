@@ -1,0 +1,110 @@
+# Registry of real data sources for Data IA Pass 2.
+# Do NOT add scrapers for Umm Al-Qura, KAPSARC, Ookla, Saudi Exchange, or Etimad salary APIs.
+
+sources:
+  - id: worldbank
+    name: World Bank Indicators (SAU)
+    url: https://api.worldbank.org/v2/
+    class: multilateral
+    access_method: rest_json
+    key_required: false
+    license: World Bank open data terms
+    update_frequency: annual_to_irregular
+    priority: 1
+    connector: worldbank
+    correlation_group: multilaterals
+    notes: GDP, population, internet/mobile indicators for SAU.
+
+  - id: imf
+    name: IMF SDMX 3.0 WEO
+    url: https://api.imf.org/external/sdmx/3.0/
+    class: multilateral
+    access_method: sdmx_json
+    key_required: false
+    license: IMF data terms of use
+    update_frequency: biannual_weo
+    priority: 2
+    connector: imf
+    correlation_group: multilaterals
+    notes: WEO macro series for SAU (e.g. NGDP_RPCH).
+
+  - id: comtrade
+    name: UN Comtrade public preview
+    url: https://comtradeapi.un.org/public/v1/
+    class: multilateral
+    access_method: rest_json
+    key_required: false
+    license: UN Comtrade terms (preview rate limits)
+    update_frequency: annual
+    priority: 3
+    connector: comtrade
+    correlation_group: multilaterals
+    notes: Limited preview KSA trade flows; respect rate limits.
+
+  - id: gastat
+    name: GASTAT developer portal
+    url: https://www.stats.gov.sa/
+    class: national_stats
+    access_method: rest_json
+    key_required: true
+    key_env: GASTAT_API_KEY
+    license: GASTAT / stats.gov.sa terms
+    update_frequency: varies
+    priority: 4
+    connector: gastat
+    correlation_group: national
+    notes: Skip gracefully if GASTAT_API_KEY absent.
+
+  - id: cma
+    name: CMA OpenDataAPIs
+    url: https://opendataapi.cma.gov.sa/
+    class: regulator
+    access_method: rest_json
+    key_required: false
+    license: CMA open data terms
+    update_frequency: varies
+    priority: 5
+    connector: cma
+    correlation_group: market_reg
+    notes: Funds, licences, rating agencies catalogue where exposed.
+
+  - id: eia
+    name: EIA Open Data
+    url: https://api.eia.gov/v2/
+    class: energy
+    access_method: rest_json
+    key_required: true
+    key_env: EIA_API_KEY
+    license: U.S. EIA public domain
+    update_frequency: monthly_to_annual
+    priority: 6
+    connector: eia
+    correlation_group: energy
+    notes: Free key — https://www.eia.gov/opendata/ — KSA energy series.
+
+  - id: sama
+    name: SAMA (optional)
+    url: https://www.sama.gov.sa/
+    class: central_bank
+    access_method: optional_api
+    key_required: false
+    license: SAMA terms
+    update_frequency: unknown
+    priority: 9
+    connector: sama
+    correlation_group: national
+    notes: Optional; skip if no confirmed JSON API (no scraping).
+
+correlation_groups:
+  multilaterals:
+    rho: 0.35
+    description: Macro outlets that often publish overlapping SAU aggregates
+  national:
+    rho: 0.2
+  market_reg:
+    rho: 0.1
+  energy:
+    rho: 0.0
+  press_wire:
+    rho: 0.8
+    description: Outlets relaying the same wire
