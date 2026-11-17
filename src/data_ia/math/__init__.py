@@ -18,6 +18,7 @@ from data_ia.math.sources import (
     SourceReliability,
     estimate_source_reliability,
     fuse_observations,
+    n_eff,
     precision_weight,
     shrink_toward_prior,
 )
@@ -44,6 +45,7 @@ __all__ = [
     "fuse_observations",
     "gaussian_surprise",
     "logit",
+    "n_eff",
     "precision_weight",
     "shrink_toward_prior",
     "sigmoid",

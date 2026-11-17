@@ -15,6 +15,7 @@ from data_ia.math.sources import (
     SourceReliability,
     estimate_source_reliability,
     fuse_observations,
+    n_eff,
     precision_weight,
     shrink_toward_prior,
 )
@@ -247,3 +248,93 @@ def test_end_to_end_estimate_then_fuse(biased_errors, unit_prior):
     assert 0.0 < result.estimate < 1.0
     assert result.variance > 0
     assert abs(sum(c.weight for c in result.contributions) - 1.0) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Correlated sources (n_eff)
+# ---------------------------------------------------------------------------
+
+
+def test_n_eff_independent_equals_n():
+    assert n_eff(5, 0.0) == pytest.approx(5.0)
+
+
+def test_n_eff_fully_correlated_equals_one():
+    assert n_eff(5, 1.0) == pytest.approx(1.0)
+
+
+def test_n_eff_partial_correlation():
+    # n=3, rho=0.5 → 3 / (1 + 2*0.5) = 3/2 = 1.5
+    assert n_eff(3, 0.5) == pytest.approx(1.5)
+
+
+def test_n_eff_rejects_bad_args():
+    with pytest.raises(ValueError):
+        n_eff(0, 0.0)
+    with pytest.raises(ValueError):
+        n_eff(2, -0.1)
+    with pytest.raises(ValueError):
+        n_eff(2, 1.1)
+
+
+def test_fusion_correlated_group_reduces_precision():
+    """Two equal-tau wire outlets with rho=1 act as one independent source."""
+    rels = {
+        "wire_a": SourceReliability(
+            "wire_a", bias=0.0, variance=0.25, precision=4.0, n_obs=5, lambda_n=1.0, shrunk=False
+        ),
+        "wire_b": SourceReliability(
+            "wire_b", bias=0.0, variance=0.25, precision=4.0, n_obs=5, lambda_n=1.0, shrunk=False
+        ),
+    }
+    independent = fuse_observations({"wire_a": 0.6, "wire_b": 0.6}, rels)
+    correlated = fuse_observations(
+        {"wire_a": 0.6, "wire_b": 0.6},
+        rels,
+        correlation_groups={"same_wire": ["wire_a", "wire_b"]},
+        group_rho={"same_wire": 1.0},
+    )
+    assert independent.precision == pytest.approx(8.0)
+    # n_eff=1 → each scaled by 1/2 → total tau = 4
+    assert correlated.precision == pytest.approx(4.0)
+    assert correlated.variance == pytest.approx(0.25)
+
+
+def test_fusion_partial_rho_scales_n_eff():
+    rels = {
+        "a": SourceReliability(
+            "a", bias=0.0, variance=1.0, precision=1.0, n_obs=3, lambda_n=1.0, shrunk=False
+        ),
+        "b": SourceReliability(
+            "b", bias=0.0, variance=1.0, precision=1.0, n_obs=3, lambda_n=1.0, shrunk=False
+        ),
+        "c": SourceReliability(
+            "c", bias=0.0, variance=1.0, precision=1.0, n_obs=3, lambda_n=1.0, shrunk=False
+        ),
+    }
+    # n=3, rho=0.5 → n_eff=1.5 → scale=0.5 → total tau = 1.5
+    result = fuse_observations(
+        {"a": 0.5, "b": 0.5, "c": 0.5},
+        rels,
+        correlation_groups={"press": ["a", "b", "c"]},
+        group_rho={"press": 0.5},
+    )
+    assert result.precision == pytest.approx(1.5)
+
+
+def test_fusion_rejects_source_in_multiple_groups():
+    rels = {
+        "a": SourceReliability(
+            "a", bias=0.0, variance=1.0, precision=1.0, n_obs=1, lambda_n=1.0, shrunk=False
+        ),
+        "b": SourceReliability(
+            "b", bias=0.0, variance=1.0, precision=1.0, n_obs=1, lambda_n=1.0, shrunk=False
+        ),
+    }
+    with pytest.raises(ValueError, match="multiple correlation groups"):
+        fuse_observations(
+            {"a": 0.5, "b": 0.5},
+            rels,
+            correlation_groups={"g1": ["a", "b"], "g2": ["a"]},
+            group_rho={"g1": 0.5, "g2": 0.5},
+        )

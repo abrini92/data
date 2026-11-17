@@ -26,6 +26,7 @@ Precision-weighted fusion of debiased observations for one sub-question:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping, Sequence
 
 import numpy as np
 
@@ -196,9 +197,26 @@ def precision_weight(precision: float, total_precision: float) -> float:
     return precision / total_precision
 
 
+def n_eff(n: int, rho: float) -> float:
+    """Effective independent-source count under pairwise correlation rho.
+
+    n_eff = n / (1 + (n - 1) * rho)
+
+    rho=0 → n_eff=n (independent); rho=1 → n_eff=1 (fully redundant).
+    """
+    if n < 1:
+        raise ValueError("n must be at least 1")
+    if not 0.0 <= rho <= 1.0:
+        raise ValueError("rho must be in [0, 1]")
+    return float(n) / (1.0 + (n - 1) * rho)
+
+
 def fuse_observations(
     readings: dict[str, float],
     reliabilities: dict[str, SourceReliability],
+    *,
+    correlation_groups: Mapping[str, Sequence[str]] | None = None,
+    group_rho: Mapping[str, float] | None = None,
 ) -> FusionResult:
     """Precision-weighted fusion of debiased source readings for one node.
 
@@ -206,9 +224,21 @@ def fuse_observations(
     Sources present in readings but missing from reliabilities raise KeyError.
     Sources with zero precision are ignored; at least one positive precision
     is required.
+
+    Optional correlation: ``correlation_groups`` maps group_id -> source ids
+    that relay the same wire (or otherwise share noise). ``group_rho`` maps
+    group_id -> pairwise correlation in [0, 1]. Each member of a group of
+    size n with correlation rho has its precision scaled by n_eff/n so the
+    group's total precision matches tau * n_eff when members share equal tau.
     """
     if not readings:
         raise ValueError("readings must not be empty")
+
+    scale_by_source = _correlation_precision_scales(
+        list(readings.keys()),
+        correlation_groups=correlation_groups,
+        group_rho=group_rho,
+    )
 
     total_tau = 0.0
     weighted_sum = 0.0
@@ -216,7 +246,7 @@ def fuse_observations(
 
     for source_id, z in readings.items():
         rel = reliabilities[source_id]
-        tau = rel.precision
+        tau = rel.precision * scale_by_source.get(source_id, 1.0)
         if tau <= 0:
             continue
         z_hat = rel.debias(z)
@@ -245,3 +275,36 @@ def fuse_observations(
         precision=float(total_tau),
         contributions=contributions,
     )
+
+
+def _correlation_precision_scales(
+    source_ids: Sequence[str],
+    *,
+    correlation_groups: Mapping[str, Sequence[str]] | None,
+    group_rho: Mapping[str, float] | None,
+) -> dict[str, float]:
+    """Return per-source precision multipliers (default 1.0)."""
+    scales = {sid: 1.0 for sid in source_ids}
+    if not correlation_groups:
+        return scales
+
+    rhos = group_rho or {}
+    claimed: set[str] = set()
+    for gid, members in correlation_groups.items():
+        present = [sid for sid in members if sid in scales]
+        if not present:
+            continue
+        overlap = claimed.intersection(present)
+        if overlap:
+            raise ValueError(
+                f"source(s) {sorted(overlap)!r} appear in multiple correlation groups"
+            )
+        claimed.update(present)
+        if len(present) < 2:
+            continue
+        rho = float(rhos.get(gid, 0.0))
+        eff = n_eff(len(present), rho)
+        factor = eff / float(len(present))
+        for sid in present:
+            scales[sid] = factor
+    return scales

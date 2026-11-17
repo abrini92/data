@@ -79,8 +79,20 @@ class StrategistAgent(Agent):
         all_weights: dict[str, float] = defaultdict(float)
         leaf_meta: dict[str, Any] = {}
 
+        corr_groups = context.get("correlation_groups") or (
+            (context.get("seed") or {}).get("correlation_groups")
+        )
+        corr_rho = context.get("group_rho") or (
+            (context.get("seed") or {}).get("group_rho")
+        )
+
         for leaf_id, readings in by_leaf.items():
-            fusion = fuse_observations(readings, reliabilities)
+            fusion = fuse_observations(
+                readings,
+                reliabilities,
+                correlation_groups=corr_groups,
+                group_rho=corr_rho,
+            )
             # Clip fused estimate into probability domain for taxonomy leaves
             p = float(np.clip(fusion.estimate, 1e-6, 1 - 1e-6))
             leaf_probs[leaf_id] = p
