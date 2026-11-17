@@ -1,0 +1,89 @@
+{
+  "info": [
+    {
+      "obsvalue": "35,013,414",
+      "title": "Population",
+      "frequency": "2020",
+      "icon": "fas fa-users",
+      "link": 131,
+      "ord": 1,
+      "status": 1,
+      "sub_title": null,
+      "ar_sub_title": null,
+      "en_sub_title": null,
+      "ar_title": "السكان",
+      "en_title": "Population"
+    },
+    {
+      "obsvalue": "2.4",
+      "title": "Population Growth Rate",
+      "frequency": "2019",
+      "icon": "fas fa-chart-area",
+      "link": 132,
+      "ord": 2,
+      "status": 1,
+      "sub_title": "(%)",
+      "ar_sub_title": "(%)",
+      "en_sub_title": "(%)",
+      "ar_title": "معدل النمو السكاني",
+      "en_title": "Population Growth Rate"
+    },
+    {
+      "obsvalue": "2,531,406",
+      "title": "GDP-Constant Prices",
+      "frequency": "2020",
+      "icon": "fas fa-coins",
+      "link": 150,
+      "ord": 3,
+      "status": 1,
+      "sub_title": " (Million SAR)",
+      "ar_sub_title": "(ملايين الريالات)",
+      "en_sub_title": " (Million SAR)",
+      "ar_title": "الناتج المحلي الإجمالي بالأسعار الثابتة",
+      "en_title": "GDP-Constant Prices"
+    },
+    {
+      "obsvalue": "74,769",
+      "title": "Per-Capita Income",
+      "frequency": "2020",
+      "icon": "fas fa-dollar-sign",
+      "link": 145,
+      "ord": 4,
+      "status": 1,
+      "sub_title": "(SAR)",
+      "ar_sub_title": "(ريال سعودي)",
+      "en_sub_title": "(SAR)",
+      "ar_title": "نصيب الفرد من الناتج المحلي الإجمالي",
+      "en_title": "Per-Capita Income"
+    },
+    {
+      "obsvalue": "11.7",
+      "title": "Saudi Unemployment Rate",
+      "frequency": "2021 / Q1",
+      "icon": "fas fa-users-cog",
+      "link": 108,
+      "ord": 5,
+      "status": 1,
+      "sub_title": "(%)",
+      "ar_sub_title": "(%)",
+      "en_sub_title": "(%)",
+      "ar_title": "معدل البطالة بين السعوديين",
+      "en_title": "Saudi Unemployment Rate"
+    },
+    {
+      "obsvalue": "5.3",
+      "title": "Inflation Rate",
+      "frequency": "2021 / 04",
+      "icon": "fas fa-chart-line",
+      "link": 253,
+      "ord": 6,
+      "status": 1,
+      "sub_title": "(Year-to-Year, %)",
+      "ar_sub_title": "(سنوي (%))",
+      "en_sub_title": "(Year-to-Year, %)",
+      "ar_title": "معدل التضخم",
+      "en_title": "Inflation Rate"
+    }
+  ],
+  "note": "Sanitised sample of live cardsinfo payload captured 2026-11-18. No PII. Official portal route database.stats.gov.sa (not www.stats.gov.sa/api/)."
+}

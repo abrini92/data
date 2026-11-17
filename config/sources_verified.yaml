@@ -1,0 +1,105 @@
+# Registre des sources Data IA (KSA) - premier lot (10 sources)
+# Vérification : 18 nov. 2026, Asia/Riyadh. Grille de classes validée par l'utilisateur le 18 nov. 2026.
+# Classes : A = statistique officielle primaire saoudienne (base 0.90) ; B = organisme international (0.80) ;
+#           C = régulateur ou donnée de marché (0.75) ; D = presse ou source commerciale (0.50). Ajustement max ±0.10.
+# Tout ce qui n'est pas vérifié porte [à confirmer]. Les a priori sont des points de départ, recalibrés sur les erreurs observées.
+sources:
+  - name: General Authority for Statistics (GASTAT)
+    url: https://www.stats.gov.sa/en
+    class: A
+    reliability_prior: 0.95
+    access: API officielle (portail développeur dp.stats.gov.sa/opendata) et fichiers (database.stats.gov.sa)
+    key_required: "[à confirmer]"
+    license: "Conditions de réutilisation [à confirmer]. robots.txt de www.stats.gov.sa : Disallow: /api/ ; n'utiliser que le portail développeur officiel."
+    update_frequency: "Variable selon l'indicateur (inflation mensuelle, PIB et chômage trimestriels, population annuelle), calendrier de publications sur le site."
+    priority: haute
+
+  - name: National Open Data Platform
+    url: https://open.data.gov.sa/en/home
+    class: A
+    reliability_prior: 0.80
+    access: "Portail de jeux (application Angular). API publique de données [à confirmer] : aucune documentation développeur trouvée."
+    key_required: "[à confirmer]"
+    license: "Open Data Policy de SDAIA [à confirmer, PDF non lu]. Les producteurs (CST, MoF, MISA) imposent l'attribution et interdisent les usages politiques, illicites ou discriminatoires."
+    update_frequency: "[à confirmer] - dépend de chaque jeu et de l'entité productrice"
+    priority: haute
+
+  - name: Ministry of Finance
+    url: https://mof.gov.sa/en/open-data
+    class: A
+    reliability_prior: 0.95
+    access: Téléchargement CSV/XLSX/PDF (pas d'API REST publique constatée)
+    key_required: false
+    license: "Politique de données ouvertes du ministère : réutilisation autorisée avec citation du lien du portail MoF, sans déformation ; usages politiques, illicites ou discriminatoires interdits ; continuité non garantie."
+    update_frequency: "Budget trimestriel ; données macro et financières mensuelles (via open.data.gov.sa) ; dépenses, dette et recettes annuelles."
+    priority: haute
+
+  - name: Saudi Central Bank (SAMA)
+    url: https://www.sama.gov.sa/en-US/Statistics/pages/summary.aspx
+    class: A
+    reliability_prior: 0.85
+    access: "API annoncée par SAMA [à confirmer : manuel non obtenu] et publications statistiques"
+    key_required: "[à confirmer]"
+    license: "« © 2025 Saudi Central Bank (SAMA). All rights reserved. » Conditions de réutilisation [à confirmer]."
+    update_frequency: "« Published periodically » ; fréquence par série [à confirmer]"
+    priority: haute
+
+  - name: World Bank Indicators API
+    url: https://datahelpdesk.worldbank.org/knowledgebase/articles/898581-api-basic-call-structures
+    class: B
+    reliability_prior: 0.85
+    access: API REST officielle (JSON, XML, CSV, Excel), base https://api.worldbank.org/v2
+    key_required: false
+    license: "Conditions : https://data.worldbank.org/summary-terms-of-use - texte [à confirmer]"
+    update_frequency: "Dépend de l'indicateur [à confirmer]"
+    priority: haute
+
+  - name: IMF Data API (SDMX 3.0)
+    url: https://api.imf.org/external/sdmx/3.0/structure/dataflow
+    class: B
+    reliability_prior: 0.85
+    access: API REST officielle SDMX 3.0
+    key_required: "Non pour le catalogue et le dataflow WEO ; autres flux [à confirmer]"
+    license: "Conditions : https://www.imf.org/en/about/copyright-and-terms - texte [à confirmer]"
+    update_frequency: "WEO semestriel (avril et septembre/octobre) ; autres flux [à confirmer]"
+    priority: haute
+
+  - name: UN Comtrade
+    url: https://comtradeplus.un.org/en/api-docs
+    class: B
+    reliability_prior: 0.80
+    access: API REST officielle, Public API https://comtradeapi.un.org/public/v1 (aperçu jusqu'à 500 lignes)
+    key_required: "Non pour la Public API ; oui (clé de souscription) pour Bulk et Async"
+    license: "Conditions de réutilisation détaillées [à confirmer]"
+    update_frequency: "Séries annuelles et mensuelles ; calendrier de publication par pays [à confirmer]"
+    priority: haute
+
+  - name: Capital Market Authority (CMA)
+    url: https://cma.gov.sa/en/AboutCMA/ResearchAndReports/opendata/Pages/default.aspx
+    class: C
+    reliability_prior: 0.75
+    access: "API REST officielle, spécification https://opendataapi.cma.gov.sa/swagger/v1/swagger.json (GetAllCRACompanies, GetAllOrganizations, GetAllPrivateFunds, GetAllPublicFunds)"
+    key_required: "[à confirmer] - pas de schéma d'authentification dans la spécification, appel de données non abouti"
+    license: "« © Capital Market Authority All rights reserved » ; conditions de réutilisation [à confirmer]"
+    update_frequency: "[à confirmer]"
+    priority: haute
+
+  - name: U.S. Energy Information Administration (EIA) Open Data API
+    url: https://www.eia.gov/opendata/documentation.php
+    class: B
+    reliability_prior: 0.85
+    access: API REST officielle (APIv2)
+    key_required: true  # clé gratuite : https://www.eia.gov/opendata/register.php
+    license: "Domaine public (publications du gouvernement américain), réutilisation et redistribution autorisées avec mention de la source et de la date ; logos et contenus tiers exclus."
+    update_frequency: "Dépend de la série [à confirmer]"
+    priority: haute
+
+  - name: Communications, Space & Technology Commission (CST)
+    url: https://www.cst.gov.sa/en/knowledge-center/open-data
+    class: C  # C + ajustement +0,10 : régulateur avec des données de marché directes
+    reliability_prior: 0.85
+    access: Téléchargement de fichiers, jeux hébergés sur open.data.gov.sa (pas d'API propre constatée)
+    key_required: false
+    license: "Données gratuites et sans restriction d'accès ; citation du lien du portail CST obligatoire, sans déformation ; usages politiques ou illicites interdits ; continuité non garantie."
+    update_frequency: "[à confirmer]"
+    priority: haute

@@ -1,99 +1,176 @@
-# Registry of real data sources for Data IA Pass 2.
-# Do NOT add scrapers for Umm Al-Qura, KAPSARC, Ookla, Saudi Exchange, or Etimad salary APIs.
+# Registre des sources Data IA (KSA) — merged Pass 2 connectors + verified Nov 18 2026 lot.
+# Vérification : 18 nov. 2026, Asia/Riyadh. Classes A/B/C/D and reliability_prior from
+# config/sources_verified.yaml. Keep [à confirmer] markers as-is.
+# Classes : A = statistique officielle primaire saoudienne ; B = organisme international ;
+#           C = régulateur ou donnée de marché ; D = presse ou source commerciale.
+# reliability_prior ∈ [0,1] — mapped to prior bias/variance via config/prior_mapping.yaml
+# (PROVISIONAL – pending validation by the model owner).
+# No connector for open.data.gov.sa (no documented public API). SAMA stays skipped.
 
 sources:
+  - id: gastat
+    name: General Authority for Statistics (GASTAT)
+    url: https://www.stats.gov.sa/en
+    class: A
+    source_class: national_stats
+    reliability_prior: 0.95
+    access: API officielle (portail développeur dp.stats.gov.sa/opendata) et fichiers (database.stats.gov.sa)
+    access_method: rest_json
+    key_required: "[à confirmer]"
+    key_env: GASTAT_API_KEY
+    license: "Conditions de réutilisation [à confirmer]. robots.txt de www.stats.gov.sa : Disallow: /api/ ; n'utiliser que le portail développeur officiel."
+    update_frequency: "Variable selon l'indicateur (inflation mensuelle, PIB et chômage trimestriels, population annuelle), calendrier de publications sur le site."
+    priority: 1
+    connector: gastat
+    correlation_group: national
+    notes: Official developer portal routes only; never www.stats.gov.sa/api/.
+
+  - id: open_data_gov_sa
+    name: National Open Data Platform
+    url: https://open.data.gov.sa/en/home
+    class: A
+    source_class: national_stats
+    reliability_prior: 0.80
+    access: "Portail de jeux (application Angular). API publique de données [à confirmer] : aucune documentation développeur trouvée."
+    access_method: none
+    key_required: "[à confirmer]"
+    license: "Open Data Policy de SDAIA [à confirmer, PDF non lu]. Les producteurs (CST, MoF, MISA) imposent l'attribution et interdisent les usages politiques, illicites ou discriminatoires."
+    update_frequency: "[à confirmer] - dépend de chaque jeu et de l'entité productrice"
+    priority: 2
+    connector: null
+    correlation_group: national
+    notes: "No connector — no documented public API; do not use internal Angular routes."
+
+  - id: mof
+    name: Ministry of Finance
+    url: https://mof.gov.sa/en/open-data
+    class: A
+    source_class: national_stats
+    reliability_prior: 0.95
+    access: Téléchargement CSV/XLSX/PDF (pas d'API REST publique constatée)
+    access_method: file_download
+    key_required: false
+    license: "Politique de données ouvertes du ministère : réutilisation autorisée avec citation du lien du portail MoF, sans déformation ; usages politiques, illicites ou discriminatoires interdits ; continuité non garantie."
+    update_frequency: "Budget trimestriel ; données macro et financières mensuelles (via open.data.gov.sa) ; dépenses, dette et recettes annuelles."
+    priority: 3
+    connector: null
+    correlation_group: national
+    notes: File downloads only; no REST connector in v1.
+
+  - id: sama
+    name: Saudi Central Bank (SAMA)
+    url: https://www.sama.gov.sa/en-US/Statistics/pages/summary.aspx
+    class: A
+    source_class: central_bank
+    reliability_prior: 0.85
+    access: "API annoncée par SAMA [à confirmer : manuel non obtenu] et publications statistiques"
+    access_method: optional_api
+    key_required: "[à confirmer]"
+    key_env: SAMA_API_KEY
+    license: "« © 2025 Saudi Central Bank (SAMA). All rights reserved. » Conditions de réutilisation [à confirmer]."
+    update_frequency: "« Published periodically » ; fréquence par série [à confirmer]"
+    priority: 9
+    connector: sama
+    correlation_group: national
+    optional: true
+    notes: Optional; skip if no confirmed JSON API (no scraping).
+
   - id: worldbank
-    name: World Bank Indicators (SAU)
-    url: https://api.worldbank.org/v2/
-    class: multilateral
+    name: World Bank Indicators API
+    url: https://datahelpdesk.worldbank.org/knowledgebase/articles/898581-api-basic-call-structures
+    class: B
+    source_class: multilateral
+    reliability_prior: 0.85
+    access: API REST officielle (JSON, XML, CSV, Excel), base https://api.worldbank.org/v2
     access_method: rest_json
     key_required: false
-    license: World Bank open data terms
-    update_frequency: annual_to_irregular
-    priority: 1
+    license: "Conditions : https://data.worldbank.org/summary-terms-of-use - texte [à confirmer]"
+    update_frequency: "Dépend de l'indicateur [à confirmer]"
+    priority: 4
     connector: worldbank
     correlation_group: multilaterals
     notes: GDP, population, internet/mobile indicators for SAU.
 
   - id: imf
-    name: IMF SDMX 3.0 WEO
-    url: https://api.imf.org/external/sdmx/3.0/
-    class: multilateral
+    name: IMF Data API (SDMX 3.0)
+    url: https://api.imf.org/external/sdmx/3.0/structure/dataflow
+    class: B
+    source_class: multilateral
+    reliability_prior: 0.85
+    access: API REST officielle SDMX 3.0
     access_method: sdmx_json
-    key_required: false
-    license: IMF data terms of use
-    update_frequency: biannual_weo
-    priority: 2
+    key_required: "Non pour le catalogue et le dataflow WEO ; autres flux [à confirmer]"
+    license: "Conditions : https://www.imf.org/en/about/copyright-and-terms - texte [à confirmer]"
+    update_frequency: "WEO semestriel (avril et septembre/octobre) ; autres flux [à confirmer]"
+    priority: 5
     connector: imf
     correlation_group: multilaterals
     notes: WEO macro series for SAU (e.g. NGDP_RPCH).
 
   - id: comtrade
-    name: UN Comtrade public preview
-    url: https://comtradeapi.un.org/public/v1/
-    class: multilateral
+    name: UN Comtrade
+    url: https://comtradeplus.un.org/en/api-docs
+    class: B
+    source_class: multilateral
+    reliability_prior: 0.80
+    access: API REST officielle, Public API https://comtradeapi.un.org/public/v1 (aperçu jusqu'à 500 lignes)
     access_method: rest_json
-    key_required: false
-    license: UN Comtrade terms (preview rate limits)
-    update_frequency: annual
-    priority: 3
+    key_required: "Non pour la Public API ; oui (clé de souscription) pour Bulk et Async"
+    license: "Conditions de réutilisation détaillées [à confirmer]"
+    update_frequency: "Séries annuelles et mensuelles ; calendrier de publication par pays [à confirmer]"
+    priority: 6
     connector: comtrade
     correlation_group: multilaterals
     notes: Limited preview KSA trade flows; respect rate limits.
 
-  - id: gastat
-    name: GASTAT developer portal
-    url: https://www.stats.gov.sa/
-    class: national_stats
-    access_method: rest_json
-    key_required: true
-    key_env: GASTAT_API_KEY
-    license: GASTAT / stats.gov.sa terms
-    update_frequency: varies
-    priority: 4
-    connector: gastat
-    correlation_group: national
-    notes: Skip gracefully if GASTAT_API_KEY absent.
-
-  - id: cma
-    name: CMA OpenDataAPIs
-    url: https://opendataapi.cma.gov.sa/
-    class: regulator
-    access_method: rest_json
-    key_required: false
-    license: CMA open data terms
-    update_frequency: varies
-    priority: 5
-    connector: cma
-    correlation_group: market_reg
-    notes: Funds, licences, rating agencies catalogue where exposed.
-
   - id: eia
-    name: EIA Open Data
-    url: https://api.eia.gov/v2/
-    class: energy
+    name: U.S. Energy Information Administration (EIA) Open Data API
+    url: https://www.eia.gov/opendata/documentation.php
+    class: B
+    source_class: energy
+    reliability_prior: 0.85
+    access: API REST officielle (APIv2)
     access_method: rest_json
     key_required: true
     key_env: EIA_API_KEY
-    license: U.S. EIA public domain
-    update_frequency: monthly_to_annual
-    priority: 6
+    license: "Domaine public (publications du gouvernement américain), réutilisation et redistribution autorisées avec mention de la source et de la date ; logos et contenus tiers exclus."
+    update_frequency: "Dépend de la série [à confirmer]"
+    priority: 7
     connector: eia
     correlation_group: energy
-    notes: Free key — https://www.eia.gov/opendata/ — KSA energy series.
+    notes: Free key — https://www.eia.gov/opendata/register.php — KSA energy series.
 
-  - id: sama
-    name: SAMA (optional)
-    url: https://www.sama.gov.sa/
-    class: central_bank
-    access_method: optional_api
+  - id: cma
+    name: Capital Market Authority (CMA)
+    url: https://cma.gov.sa/en/AboutCMA/ResearchAndReports/opendata/Pages/default.aspx
+    class: C
+    source_class: regulator
+    reliability_prior: 0.75
+    access: "API REST officielle, spécification https://opendataapi.cma.gov.sa/swagger/v1/swagger.json (GetAllCRACompanies, GetAllOrganizations, GetAllPrivateFunds, GetAllPublicFunds)"
+    access_method: rest_json
+    key_required: "[à confirmer] - pas de schéma d'authentification dans la spécification, appel de données non abouti"
+    license: "« © Capital Market Authority All rights reserved » ; conditions de réutilisation [à confirmer]"
+    update_frequency: "[à confirmer]"
+    priority: 8
+    connector: cma
+    correlation_group: market_reg
+    notes: Configurable timeout; live_failed falls back to fixture labelled SYNTHETIC (never REAL).
+
+  - id: cst
+    name: Communications, Space & Technology Commission (CST)
+    url: https://www.cst.gov.sa/en/knowledge-center/open-data
+    class: C
+    source_class: regulator
+    reliability_prior: 0.85
+    access: Téléchargement de fichiers, jeux hébergés sur open.data.gov.sa (pas d'API propre constatée)
+    access_method: file_download
     key_required: false
-    license: SAMA terms
-    update_frequency: unknown
-    priority: 9
-    connector: sama
-    correlation_group: national
-    notes: Optional; skip if no confirmed JSON API (no scraping).
+    license: "Données gratuites et sans restriction d'accès ; citation du lien du portail CST obligatoire, sans déformation ; usages politiques ou illicites interdits ; continuité non garantie."
+    update_frequency: "[à confirmer]"
+    priority: 10
+    connector: null
+    correlation_group: market_reg
+    notes: File downloads / open.data.gov.sa hosting; no dedicated connector.
 
 correlation_groups:
   multilaterals:

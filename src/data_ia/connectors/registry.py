@@ -50,6 +50,7 @@ def list_sources(*, include_optional: bool = False) -> list[dict[str, Any]]:
         optional = src.get("id") == "sama" or bool(src.get("optional"))
         if optional and not include_optional:
             continue
+        key_req = src.get("key_required")
         out.append(
             {
                 "name": src["id"],
@@ -57,11 +58,14 @@ def list_sources(*, include_optional: bool = False) -> list[dict[str, Any]]:
                 "title": src.get("name"),
                 "url": src.get("url"),
                 "class": src.get("class"),
-                "key_required": bool(src.get("key_required")),
+                "reliability_prior": src.get("reliability_prior"),
+                "access": src.get("access"),
+                "key_required": key_req,
                 "key_env": src.get("key_env"),
                 "license": src.get("license"),
                 "update_frequency": src.get("update_frequency"),
                 "priority": src.get("priority"),
+                "connector": src.get("connector"),
                 "optional": optional,
                 "correlation_group": src.get("correlation_group"),
             }

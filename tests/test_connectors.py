@@ -15,7 +15,14 @@ from data_ia.math.controller_rules import (
 def test_registry_lists_first_batch():
     names = {s["name"] for s in list_sources(include_optional=True)}
     assert {"worldbank", "imf", "comtrade", "gastat", "cma", "eia", "sama"} <= names
-    assert load_sources_registry()["sources"]
+    # Verified Nov 18 lot also includes open_data_gov_sa, mof, cst (no connectors).
+    all_ids = {s["id"] for s in list_sources(include_optional=True)}
+    assert {"open_data_gov_sa", "mof", "cst"} <= all_ids
+    reg = load_sources_registry()
+    assert reg["sources"]
+    gastat = next(s for s in reg["sources"] if s["id"] == "gastat")
+    assert gastat["reliability_prior"] == 0.95
+    assert "[à confirmer]" in str(gastat.get("key_required"))
 
 
 @pytest.mark.parametrize(
