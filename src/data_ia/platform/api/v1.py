@@ -1,15 +1,17 @@
-"""GET-only /api/v1 routes (Lot 1)."""
+"""GET-only /api/v1 routes (Lots 1–2)."""
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from data_ia import __version__
+from data_ia.platform.auth import AuthUser
 from data_ia.platform.envelope import envelope
+from data_ia.platform.logging import get_platform_logger
 from data_ia.platform.readonly import DatabaseStatus, ReadOnlyDatabase
 from data_ia.platform.services import registry as registry_svc
 from data_ia.platform.services import verify as verify_svc
@@ -27,6 +29,10 @@ def _db(request: Request) -> ReadOnlyDatabase | None:
     return getattr(request.app.state, "db", None)
 
 
+def _user(request: Request) -> AuthUser | None:
+    return getattr(request.state, "user", None)
+
+
 def _status(request: Request) -> DatabaseStatus:
     db = _db(request)
     if db is None:
@@ -41,14 +47,21 @@ def _status(request: Request) -> DatabaseStatus:
 
 
 def _git_commit() -> str:
+    """Read HEAD without spawning a subprocess (A3.9)."""
     try:
-        out = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=str(Path(__file__).resolve().parents[4]),
-            stderr=subprocess.DEVNULL,
-            text=True,
-        )
-        return out.strip()[:40]
+        from data_ia.config import REPO_ROOT
+
+        head = REPO_ROOT / ".git" / "HEAD"
+        if not head.is_file():
+            return "unknown"
+        content = head.read_text(encoding="utf-8").strip()
+        if content.startswith("ref:"):
+            ref = content.split(":", 1)[1].strip()
+            ref_path = REPO_ROOT / ".git" / ref
+            if ref_path.is_file():
+                return ref_path.read_text(encoding="utf-8").strip()[:40]
+            return "unknown"
+        return content[:40]
     except Exception:  # noqa: BLE001
         return "unknown"
 
@@ -57,6 +70,24 @@ def _git_commit() -> str:
 def health(request: Request) -> dict[str, Any]:
     settings = _settings(request)
     st = _status(request)
+    user = _user(request)
+    # Minimal health without session (A2.1).
+    if user is None:
+        return envelope(
+            {
+                "version": __version__,
+                "database": {
+                    "present": st.present,
+                    "migrated": st.migrated,
+                    "message": st.message,
+                    "read_only": True,
+                },
+                "read_only_confirmed": True,
+                "mode": "minimal",
+            },
+            env=settings.env,
+            data_label="n/a",
+        )
     return envelope(
         {
             "version": __version__,
@@ -69,6 +100,7 @@ def health(request: Request) -> dict[str, Any]:
                 "read_only": st.read_only,
             },
             "read_only_confirmed": True,
+            "mode": "full",
         },
         env=settings.env,
         data_label="n/a",
@@ -151,6 +183,49 @@ def registry_verify(request: Request) -> dict[str, Any]:
         session.close()
 
 
+@router.get("/registry/verify/export")
+def registry_verify_export(request: Request) -> JSONResponse:
+    """Audit export JSON — evaluator only (A2.6). Generated on the fly, never stored."""
+    user = _user(request)
+    if user is None:
+        raise HTTPException(status_code=401, detail="authentication required")
+    if user.role != "evaluator":
+        raise HTTPException(status_code=403, detail="evaluator role required")
+    settings = _settings(request)
+    st = _status(request)
+    correlation_id = getattr(request.state, "correlation_id", "")
+    get_platform_logger().info(
+        "audit export",
+        extra={
+            "event": "audit_export",
+            "user": user.username,
+            "role": user.role,
+            "correlation_id": correlation_id,
+            "route": "/api/v1/registry/verify/export",
+            "method": "GET",
+        },
+    )
+    if not st.present or not st.migrated:
+        body = envelope(
+            {"ok": False, "verdict": "ÉCHEC", "message": st.message, "git_commit": _git_commit()},
+            env=settings.env,
+            data_label="n/a",
+        )
+        return JSONResponse(body)
+    db = _db(request)
+    assert db is not None
+    head = Path(settings.registry_chain_head_path)
+    session = db.session()
+    try:
+        report = verify_svc.verify_registry_report(session, chain_head_path=head)
+        label = report.pop("data_label", "REAL")
+        report["git_commit"] = _git_commit()
+        report["exported_by"] = user.username
+        return JSONResponse(envelope(report, env=settings.env, data_label=str(label)))
+    finally:
+        session.close()
+
+
 @router.get("/waves")
 def waves_list(request: Request) -> dict[str, Any]:
     settings = _settings(request)
@@ -168,7 +243,3 @@ def waves_one(request: Request, wave_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="wave not found") from None
     label = item.get("data_label") or "REAL"
     return envelope({"wave": item}, env=settings.env, data_label=str(label))
-
-
-def method_not_allowed_response() -> JSONResponse:
-    return JSONResponse({"detail": "Method Not Allowed"}, status_code=405)

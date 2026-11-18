@@ -490,6 +490,111 @@ def cmd_sources(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    """Launch the read-only platform UI (requires [ui] extra)."""
+    try:
+        import uvicorn
+    except ImportError:
+        print(
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": "install the [ui] extra: pip install -e \".[ui]\"",
+                }
+            ),
+            file=sys.stderr,
+        )
+        return 2
+    from data_ia.platform.settings import (
+        PlatformConfigError,
+        load_platform_settings,
+    )
+
+    env = args.env
+    overrides: dict = {"env": env}
+    if env == "prod":
+        overrides["prod_explicit"] = True
+    if args.host:
+        overrides["ui_host"] = args.host
+    if args.port is not None:
+        overrides["ui_port"] = args.port
+    try:
+        settings = load_platform_settings(**overrides)
+    except PlatformConfigError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}), file=sys.stderr)
+        return 2
+    if settings.ui_host not in {"127.0.0.1", "localhost", "::1"}:
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "warning": "non-loopback bind requested; local use only",
+                    "host": settings.ui_host,
+                }
+            ),
+            file=sys.stderr,
+        )
+    # Import create_app only after settings validate (secret key etc.).
+    from data_ia.platform.app import create_app
+
+    app = create_app(settings=settings)
+    uvicorn.run(app, host=settings.ui_host, port=settings.ui_port, log_level="info")
+    return 0
+
+
+def cmd_ui_user(args: argparse.Namespace) -> int:
+    """Manage local UI accounts (writes users file only, never the registry)."""
+    import getpass
+
+    from data_ia.platform.auth import (
+        AuthError,
+        ROLES,
+        add_user,
+        default_users_path,
+        load_users,
+        set_user_disabled,
+    )
+
+    path = Path(args.users_path) if args.users_path else default_users_path()
+    action = args.ui_user_action
+    try:
+        if action == "add":
+            # Password never accepted as a CLI argument (BRIEF-5 §4.5).
+            password = getpass.getpass("Password: ")
+            confirm = getpass.getpass("Confirm password: ")
+            if password != confirm:
+                print(json.dumps({"ok": False, "error": "passwords do not match"}), file=sys.stderr)
+                return 2
+            role = args.role
+            if role not in ROLES:
+                print(json.dumps({"ok": False, "error": "invalid role"}), file=sys.stderr)
+                return 2
+            add_user(path, username=args.username, password=password, role=role)
+            print(json.dumps({"ok": True, "username": args.username, "role": role, "path": str(path)}))
+            return 0
+        if action == "list":
+            users = load_users(path)
+            safe = [
+                {
+                    "username": u.get("username"),
+                    "role": u.get("role"),
+                    "disabled": bool(u.get("disabled")),
+                }
+                for u in users
+            ]
+            print(json.dumps({"ok": True, "users": safe, "path": str(path)}, indent=2))
+            return 0
+        if action == "disable":
+            set_user_disabled(path, args.username, True)
+            print(json.dumps({"ok": True, "username": args.username, "disabled": True}))
+            return 0
+    except AuthError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}), file=sys.stderr)
+        return 2
+    print(json.dumps({"ok": False, "error": "unknown action"}), file=sys.stderr)
+    return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="data-ia", description=f"Data IA v{__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -616,6 +721,35 @@ def main(argv: list[str] | None = None) -> int:
 
     p_sources = sub.add_parser("sources", help="List sources.yaml registry")
     p_sources.set_defaults(func=cmd_sources)
+
+    p_ui = sub.add_parser("ui", help="Run read-only platform UI (requires [ui] extra)")
+    p_ui.add_argument("--host", default=None, help="Bind host (default 127.0.0.1)")
+    p_ui.add_argument("--port", type=int, default=None, help="Bind port (default 8520)")
+    p_ui.add_argument(
+        "--env",
+        choices=["test", "prod"],
+        default="test",
+        help="DATAIA_ENV (prod must be explicit)",
+    )
+    p_ui.set_defaults(func=cmd_ui)
+
+    p_ui_user = sub.add_parser(
+        "ui-user",
+        help="Manage local UI accounts (users file only; password via getpass)",
+    )
+    ui_user_sub = p_ui_user.add_subparsers(dest="ui_user_action", required=True)
+    p_add = ui_user_sub.add_parser("add", help="Add a user (password prompted, never as argv)")
+    p_add.add_argument("--username", required=True)
+    p_add.add_argument("--role", required=True, choices=sorted(["viewer", "analyst", "evaluator"]))
+    p_add.add_argument("--users-path", default=None, help="Override users JSON path")
+    p_add.set_defaults(func=cmd_ui_user)
+    p_list = ui_user_sub.add_parser("list", help="List local UI users")
+    p_list.add_argument("--users-path", default=None)
+    p_list.set_defaults(func=cmd_ui_user)
+    p_disable = ui_user_sub.add_parser("disable", help="Disable a local UI user")
+    p_disable.add_argument("--username", required=True)
+    p_disable.add_argument("--users-path", default=None)
+    p_disable.set_defaults(func=cmd_ui_user)
 
     args = parser.parse_args(argv)
     return int(args.func(args))
