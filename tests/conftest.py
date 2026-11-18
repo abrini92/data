@@ -24,3 +24,16 @@ def biased_errors() -> list[ErrorObservation]:
         (0.88, 0.70),
     ]
     return [ErrorObservation(z=z, x=x) for z, x in pairs]
+
+
+@pytest.fixture(autouse=True)
+def _isolate_chain_head(tmp_path_factory, monkeypatch):
+    """Keep registry chain-head writes out of the repo during tests."""
+    root = tmp_path_factory.mktemp("chain_heads")
+    path = root / "registry_chain_head.jsonl"
+    monkeypatch.setenv("REGISTRY_CHAIN_HEAD_PATH", str(path))
+    from data_ia.config import get_settings
+
+    get_settings.cache_clear()
+    yield path
+    get_settings.cache_clear()
