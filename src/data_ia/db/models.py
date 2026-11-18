@@ -23,6 +23,7 @@ from sqlalchemy import (
     UniqueConstraint,
     event,
     func,
+    inspect,
     text,
 )
 from sqlalchemy.engine import Engine
@@ -204,6 +205,23 @@ class DailySnapshot(Base):
     question: Mapped[Question] = relationship(back_populates="snapshots")
 
 
+# Marker for the append-only chain genesis row written by migrate-registry.
+CHAIN_GENESIS_QUESTION_ID = "__registry_chain_genesis__"
+CHAIN_GENESIS_METHOD = "chain_genesis"
+
+# Columns added in Pass 4 / BRIEF-4b (nullable; never rewrite existing values).
+REGISTRY_PASS4_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("prev_sha256", "VARCHAR(64)"),
+    ("p_base", "FLOAT"),
+    ("baseline_method", "VARCHAR(128)"),
+    ("series_id", "VARCHAR(256)"),
+    ("vintage_sha256", "VARCHAR(64)"),
+    ("observations_content_hash", "VARCHAR(64)"),
+    ("seed_hash", "VARCHAR(64)"),
+    ("wave_id", "VARCHAR(32)"),
+)
+
+
 class ForecastRegistry(Base):
     """Append-only frozen forecast rows. No UPDATE/DELETE (enforced by DB triggers)."""
 
@@ -240,9 +258,26 @@ class ForecastRegistry(Base):
     question: Mapped[Question] = relationship(back_populates="forecasts")
 
 
+class ForecastAnnotation(Base):
+    """Append-only labels on registry rows (e.g. TEST exclusion from brier)."""
+
+    __tablename__ = "forecast_annotations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    forecast_id: Mapped[int] = mapped_column(
+        ForeignKey("forecast_registry.id"), nullable=False, index=True
+    )
+    label: Mapped[str] = mapped_column(String(32), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 def install_forecast_registry_triggers(engine: Engine) -> None:
-    """Reject UPDATE/DELETE on forecast_registry (SQLite + Postgres)."""
+    """Reject UPDATE/DELETE on forecast_registry and forecast_annotations."""
     dialect = engine.dialect.name
+    table_names = set(inspect(engine).get_table_names())
     if dialect == "sqlite":
         stmts = [
             """
@@ -260,6 +295,25 @@ def install_forecast_registry_triggers(engine: Engine) -> None:
             END;
             """,
         ]
+        if "forecast_annotations" in table_names:
+            stmts.extend(
+                [
+                    """
+                    CREATE TRIGGER IF NOT EXISTS forecast_annotations_no_update
+                    BEFORE UPDATE ON forecast_annotations
+                    BEGIN
+                      SELECT RAISE(ABORT, 'forecast_annotations is append-only: UPDATE rejected');
+                    END;
+                    """,
+                    """
+                    CREATE TRIGGER IF NOT EXISTS forecast_annotations_no_delete
+                    BEFORE DELETE ON forecast_annotations
+                    BEGIN
+                      SELECT RAISE(ABORT, 'forecast_annotations is append-only: DELETE rejected');
+                    END;
+                    """,
+                ]
+            )
     elif dialect in {"postgresql", "postgres"}:
         stmts = [
             """
@@ -283,6 +337,31 @@ def install_forecast_registry_triggers(engine: Engine) -> None:
             FOR EACH ROW EXECUTE FUNCTION forecast_registry_reject_mutation();
             """,
         ]
+        if "forecast_annotations" in table_names:
+            stmts.extend(
+                [
+                    """
+                    CREATE OR REPLACE FUNCTION forecast_annotations_reject_mutation()
+                    RETURNS trigger AS $$
+                    BEGIN
+                      RAISE EXCEPTION 'forecast_annotations is append-only: % rejected', TG_OP;
+                    END;
+                    $$ LANGUAGE plpgsql;
+                    """,
+                    """
+                    DROP TRIGGER IF EXISTS forecast_annotations_no_update ON forecast_annotations;
+                    CREATE TRIGGER forecast_annotations_no_update
+                    BEFORE UPDATE ON forecast_annotations
+                    FOR EACH ROW EXECUTE FUNCTION forecast_annotations_reject_mutation();
+                    """,
+                    """
+                    DROP TRIGGER IF EXISTS forecast_annotations_no_delete ON forecast_annotations;
+                    CREATE TRIGGER forecast_annotations_no_delete
+                    BEFORE DELETE ON forecast_annotations
+                    FOR EACH ROW EXECUTE FUNCTION forecast_annotations_reject_mutation();
+                    """,
+                ]
+            )
     else:
         return
 

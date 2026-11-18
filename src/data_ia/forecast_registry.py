@@ -13,8 +13,16 @@ import yaml
 from sqlalchemy.orm import Session
 
 from data_ia.config import REPO_ROOT, get_settings
-from data_ia.db.models import ForecastRegistry, Observation
-from data_ia.math.registry_hash import content_sha256, forecast_sha256
+from data_ia.db.models import (
+    CHAIN_GENESIS_METHOD,
+    ForecastRegistry,
+    Observation,
+)
+from data_ia.math.registry_hash import (
+    content_sha256,
+    forecast_sha256,
+    legacy_forecast_sha256,
+)
 
 class RegistryIntegrityError(ValueError):
     """Raised when a proof row cannot be written (unknown commit, dirty tree, …)."""
@@ -91,6 +99,23 @@ def _canon_dt(value: datetime | str) -> str:
     return value.isoformat().replace("+00:00", "Z")
 
 
+def legacy_row_fields(row: ForecastRegistry) -> dict[str, Any]:
+    """Pass-3 hash payload (pre-chain)."""
+    return {
+        "question_id": row.question_id,
+        "forecast_at": _canon_dt(row.forecast_at),
+        "data_cutoff": _canon_dt(row.data_cutoff),
+        "git_commit": row.git_commit,
+        "config_hash": row.config_hash,
+        "extractor_version": row.extractor_version,
+        "observation_ids": list(row.observation_ids or []),
+        "probability": float(row.probability),
+        "interval_low": None if row.interval_low is None else float(row.interval_low),
+        "interval_high": None if row.interval_high is None else float(row.interval_high),
+        "data_label": row.data_label,
+    }
+
+
 def row_fields(row: ForecastRegistry) -> dict[str, Any]:
     return {
         "question_id": row.question_id,
@@ -113,6 +138,17 @@ def row_fields(row: ForecastRegistry) -> dict[str, Any]:
         "seed_hash": row.seed_hash,
         "wave_id": row.wave_id,
     }
+
+
+def is_chain_genesis(row: ForecastRegistry) -> bool:
+    return row.baseline_method == CHAIN_GENESIS_METHOD
+
+
+def find_chain_genesis(rows: list[ForecastRegistry]) -> ForecastRegistry | None:
+    for row in rows:
+        if is_chain_genesis(row):
+            return row
+    return None
 
 
 def _observations_content_hash(session: Session, observation_ids: list[int]) -> str:
@@ -296,22 +332,67 @@ def verify_registry(
     *,
     chain_head_path: Path | None = None,
 ) -> dict[str, Any]:
-    """Recompute every hash; check chain links, id continuity, and exported head."""
+    """Recompute hashes; legacy rows use Pass-3 digest, then chain from genesis.
+
+    Still detects coherent rewrites (hash mismatch) and deletions (id gaps /
+    chain breaks / head mismatch). Annotations are listed, never rewritten.
+    """
     rows = session.query(ForecastRegistry).order_by(ForecastRegistry.id).all()
     mismatches: list[dict[str, Any]] = []
     chain_breaks: list[dict[str, Any]] = []
     id_gaps: list[dict[str, Any]] = []
-    expected_prev: str | None = None
+    legacy_ids: list[int] = []
+    genesis = find_chain_genesis(rows)
+    genesis_id = None if genesis is None else genesis.id
+
     expected_id = 1
+    expected_prev: str | None = None
+    chain_started = False
+
     for row in rows:
         if row.id != expected_id:
             id_gaps.append({"expected_id": expected_id, "actual_id": row.id})
         expected_id = row.id + 1
 
+        is_legacy = genesis_id is not None and row.id < genesis_id
+        if is_legacy:
+            legacy_ids.append(row.id)
+            expected = legacy_forecast_sha256(legacy_row_fields(row))
+            if expected != row.sha256:
+                mismatches.append(
+                    {
+                        "id": row.id,
+                        "stored": row.sha256,
+                        "computed": expected,
+                        "schema": "legacy",
+                    }
+                )
+            # Legacy rows are pre-chain: prev_sha256 must stay unset.
+            if row.prev_sha256 is not None:
+                chain_breaks.append(
+                    {
+                        "id": row.id,
+                        "stored_prev": row.prev_sha256,
+                        "expected_prev": None,
+                        "reason": "legacy_row_has_prev",
+                    }
+                )
+            continue
+
+        # Chained segment: starts at genesis (or first row when no genesis).
+        if not chain_started:
+            expected_prev = None
+            chain_started = True
+
         expected = forecast_sha256(row_fields(row))
         if expected != row.sha256:
             mismatches.append(
-                {"id": row.id, "stored": row.sha256, "computed": expected}
+                {
+                    "id": row.id,
+                    "stored": row.sha256,
+                    "computed": expected,
+                    "schema": "chained",
+                }
             )
         if (row.prev_sha256 or None) != (expected_prev or None):
             chain_breaks.append(
@@ -325,16 +406,36 @@ def verify_registry(
 
     head_file = read_chain_head(chain_head_path)
     head_mismatch = None
-    if rows:
-        db_head = rows[-1].sha256
+    chained_rows = (
+        [r for r in rows if genesis_id is None or r.id >= genesis_id]
+        if rows
+        else []
+    )
+    if chained_rows:
+        db_head = chained_rows[-1].sha256
         if head_file is None:
-            head_mismatch = {"db_head": db_head, "file_head": None, "reason": "missing_head_file"}
+            head_mismatch = {
+                "db_head": db_head,
+                "file_head": None,
+                "reason": "missing_head_file",
+            }
         elif head_file != db_head:
             head_mismatch = {
                 "db_head": db_head,
                 "file_head": head_file,
                 "reason": "head_mismatch",
             }
+    elif rows and genesis_id is None:
+        # Only-legacy registry without genesis yet: no chain head required.
+        head_mismatch = None
+
+    annotations: list[dict[str, Any]] = []
+    try:
+        from data_ia.migrate_registry import list_annotations
+
+        annotations = list_annotations(session)
+    except Exception:  # noqa: BLE001
+        annotations = []
 
     ok = not mismatches and not chain_breaks and not id_gaps and head_mismatch is None
     # Empty registry: ok with no head file
@@ -345,10 +446,14 @@ def verify_registry(
     return {
         "ok": ok,
         "n": len(rows),
+        "legacy_n": len(legacy_ids),
+        "legacy_ids": legacy_ids,
+        "genesis_id": genesis_id,
         "mismatches": mismatches,
         "chain_breaks": chain_breaks,
         "id_gaps": id_gaps,
         "head_mismatch": head_mismatch,
+        "annotations": annotations,
     }
 
 

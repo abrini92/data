@@ -3,6 +3,7 @@
 from data_ia.db.models import (
     Base,
     DailySnapshot,
+    ForecastAnnotation,
     ForecastRegistry,
     Observation,
     Question,
@@ -18,6 +19,7 @@ from data_ia.db.session import get_session, init_db, try_init_db
 __all__ = [
     "Base",
     "DailySnapshot",
+    "ForecastAnnotation",
     "ForecastRegistry",
     "Observation",
     "Question",

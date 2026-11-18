@@ -66,10 +66,11 @@ def cmd_brier(args: argparse.Namespace) -> int:
     err = _settings_or_exit()
     if err is not None:
         return err
-    from data_ia.db.models import ForecastRegistry, ResolvedQuestion
+    from data_ia.db.models import CHAIN_GENESIS_QUESTION_ID, ForecastRegistry, ResolvedQuestion
     from data_ia.db.session import get_session, try_init_db
     from data_ia.math.brier_match import match_registry_to_resolved
     from data_ia.math.labels import MixedLabelError
+    from data_ia.migrate_registry import test_excluded_forecast_ids
 
     settings = get_settings()
     min_n = int(args.min_n if args.min_n is not None else settings.brier_min_n)
@@ -101,7 +102,27 @@ def cmd_brier(args: argparse.Namespace) -> int:
             )
 
         registry_rows = session.query(ForecastRegistry).order_by(ForecastRegistry.id).all()
-        forecasts, meta = match_registry_to_resolved(registry_rows, outcomes_by_id)
+        excluded = test_excluded_forecast_ids(session)
+        scored_rows = []
+        annotation_rejections: list[dict] = []
+        for row in registry_rows:
+            if row.question_id == CHAIN_GENESIS_QUESTION_ID:
+                continue
+            if row.id in excluded:
+                annotation_rejections.append(
+                    {
+                        "forecast_id": row.id,
+                        "question_id": row.question_id,
+                        "reason": "annotated_TEST",
+                    }
+                )
+                continue
+            scored_rows.append(row)
+        forecasts, meta = match_registry_to_resolved(scored_rows, outcomes_by_id)
+        if annotation_rejections:
+            meta.setdefault("rejected", [])
+            meta["rejected"] = list(annotation_rejections) + list(meta.get("rejected") or [])
+            meta["excluded_test_ids"] = sorted(excluded)
 
         if not forecasts:
             report = evaluate_proof([], min_n=min_n)
@@ -149,6 +170,66 @@ def cmd_verify_registry(_: argparse.Namespace) -> int:
         report = verify_registry(session)
         print(json.dumps(report, indent=2))
         return 0 if report["ok"] else 1
+    finally:
+        session.close()
+
+
+def cmd_migrate_registry(args: argparse.Namespace) -> int:
+    """ADD COLUMN + chain genesis for Pass-3 → Pass-4 registry schema."""
+    err = _settings_or_exit()
+    if err is not None:
+        return err
+    from data_ia.migrate_registry import MigrationError, migrate_registry, resolve_db_path
+
+    try:
+        db_path = resolve_db_path(args.db)
+        report = migrate_registry(db_path=db_path, dry_run=bool(args.dry_run))
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0 if report.get("ok") else 1
+    except MigrationError as exc:
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
+        return 1
+
+
+def cmd_annotate_forecast(args: argparse.Namespace) -> int:
+    """Append-only annotation on a registry row (no rewrite/delete)."""
+    err = _settings_or_exit()
+    if err is not None:
+        return err
+    from data_ia.db.session import get_session, try_init_db
+    from data_ia.migrate_registry import MigrationError, annotate_forecast
+
+    try_init_db()
+    session = get_session()
+    try:
+        ann = annotate_forecast(
+            session,
+            forecast_id=int(args.id),
+            label=str(args.label),
+            reason=str(args.reason),
+        )
+        session.commit()
+        print(
+            json.dumps(
+                {
+                    "ok": True,
+                    "annotation_id": ann.id,
+                    "forecast_id": ann.forecast_id,
+                    "label": ann.label,
+                    "reason": ann.reason,
+                    "created_at": ann.created_at.isoformat().replace("+00:00", "Z")
+                    if ann.created_at.tzinfo
+                    else ann.created_at.isoformat() + "Z",
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return 0
+    except MigrationError as exc:
+        session.rollback()
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
+        return 1
     finally:
         session.close()
 
@@ -429,6 +510,31 @@ def main(argv: list[str] | None = None) -> int:
 
     p_verify = sub.add_parser("verify-registry", help="Recompute forecast_registry hashes")
     p_verify.set_defaults(func=cmd_verify_registry)
+
+    p_migrate = sub.add_parser(
+        "migrate-registry",
+        help="ADD COLUMN + chain genesis (Pass-3 → Pass-4); never rewrites rows",
+    )
+    p_migrate.add_argument(
+        "--db",
+        default=None,
+        help="SQLite DB path (default: DATABASE_URL / data/dataia.db)",
+    )
+    p_migrate.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show columns/legacy/genesis plan; write nothing",
+    )
+    p_migrate.set_defaults(func=cmd_migrate_registry)
+
+    p_annotate = sub.add_parser(
+        "annotate-forecast",
+        help="Append-only annotation (e.g. TEST) without rewriting the registry row",
+    )
+    p_annotate.add_argument("--id", type=int, required=True, help="forecast_registry id")
+    p_annotate.add_argument("--label", required=True, help="Annotation label (e.g. TEST)")
+    p_annotate.add_argument("--reason", required=True, help="Why this annotation exists")
+    p_annotate.set_defaults(func=cmd_annotate_forecast)
 
     p_replay = sub.add_parser("replay", help="Replay engine from stored observation ids")
     p_replay.add_argument("--forecast-id", type=int, required=True)

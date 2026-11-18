@@ -4,8 +4,23 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
+
+# Pass-3 / pre-chain schema (production rows before migrate-registry).
+LEGACY_CANONICAL_FIELDS: tuple[str, ...] = (
+    "question_id",
+    "forecast_at",
+    "data_cutoff",
+    "git_commit",
+    "config_hash",
+    "extractor_version",
+    "observation_ids",
+    "probability",
+    "interval_low",
+    "interval_high",
+    "data_label",
+)
 
 # Fields that enter the canonical payload (order matters for stability).
 # B3: chain prev_sha256; cover observations content, seed, p_base, series, vintage.
@@ -42,14 +57,18 @@ def _normalize(value: Any) -> Any:
     return value
 
 
-def canonical_forecast_payload(fields: Mapping[str, Any]) -> dict[str, Any]:
-    """Build the canonical dict used for sha256 (excludes id / sha256)."""
+def _payload_for(fields: Mapping[str, Any], keys: Sequence[str]) -> dict[str, Any]:
     payload: dict[str, Any] = {}
-    for key in CANONICAL_FIELDS:
+    for key in keys:
         if key not in fields:
             raise KeyError(f"missing canonical field: {key}")
         payload[key] = _normalize(fields[key])
     return payload
+
+
+def canonical_forecast_payload(fields: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the canonical dict used for sha256 (excludes id / sha256)."""
+    return _payload_for(fields, CANONICAL_FIELDS)
 
 
 def canonical_json(fields: Mapping[str, Any]) -> str:
@@ -59,6 +78,20 @@ def canonical_json(fields: Mapping[str, Any]) -> str:
 
 def forecast_sha256(fields: Mapping[str, Any]) -> str:
     return hashlib.sha256(canonical_json(fields).encode("utf-8")).hexdigest()
+
+
+def legacy_canonical_forecast_payload(fields: Mapping[str, Any]) -> dict[str, Any]:
+    """Pre-chain (Pass 3) payload — original sha256 of production rows."""
+    return _payload_for(fields, LEGACY_CANONICAL_FIELDS)
+
+
+def legacy_canonical_json(fields: Mapping[str, Any]) -> str:
+    payload = legacy_canonical_forecast_payload(fields)
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def legacy_forecast_sha256(fields: Mapping[str, Any]) -> str:
+    return hashlib.sha256(legacy_canonical_json(fields).encode("utf-8")).hexdigest()
 
 
 def content_sha256(payload: Any) -> str:
