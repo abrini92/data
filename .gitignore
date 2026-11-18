@@ -24,4 +24,8 @@ data/*.db
 data/*.db-*
 data/raw/
 data/cache/
+data/ui/
+data/test/
 *.db
+# Platform UI logs (never commit)
+logs/

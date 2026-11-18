@@ -32,6 +32,14 @@ dev = [
 bayes = [
   "pymc>=5.10",
 ]
+# FastAPI + Jinja2 platform (BRIEF-5). Engine/CLI do not require these.
+ui = [
+  "fastapi>=0.110",
+  "uvicorn>=0.27",
+  "jinja2>=3.1",
+  "itsdangerous>=2.1",
+  "python-multipart>=0.0.9",
+]
 
 [project.scripts]
 data-ia = "data_ia.cli:main"
@@ -42,7 +50,8 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-q"
+# importlib avoids clashing tests/platform with the stdlib `platform` module.
+addopts = "-q --import-mode=importlib"
 markers = [
   "postgres: needs a reachable PostgreSQL (skip on Windows without Docker)",
 ]
