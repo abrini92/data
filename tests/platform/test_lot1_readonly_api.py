@@ -6,6 +6,8 @@ import socket
 from pathlib import Path
 
 import pytest
+
+pytest.importorskip("fastapi", reason="platform tests need the [ui] extra")
 from sqlalchemy import text
 
 import hashlib
