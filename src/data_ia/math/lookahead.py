@@ -65,7 +65,8 @@ def filter_observations_no_lookahead(
     """
     kept: list[dict[str, Any]] = []
     for obs in observations:
-        pub = obs.get("published_at") or obs.get("collected_at")
+        # B5: never fall back to collected_at — missing published_at is a hard refuse.
+        pub = obs.get("published_at")
         try:
             assert_cutoff_ordering(
                 published_at=pub,

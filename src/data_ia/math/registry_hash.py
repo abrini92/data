@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 
 # Fields that enter the canonical payload (order matters for stability).
+# B3: chain prev_sha256; cover observations content, seed, p_base, series, vintage.
 CANONICAL_FIELDS: tuple[str, ...] = (
     "question_id",
     "forecast_at",
@@ -20,12 +21,19 @@ CANONICAL_FIELDS: tuple[str, ...] = (
     "interval_low",
     "interval_high",
     "data_label",
+    "prev_sha256",
+    "p_base",
+    "baseline_method",
+    "series_id",
+    "vintage_sha256",
+    "observations_content_hash",
+    "seed_hash",
+    "wave_id",
 )
 
 
 def _normalize(value: Any) -> Any:
     if isinstance(value, float):
-        # Round-trip through format that matches JSON dumps defaults
         return float(value)
     if isinstance(value, (list, tuple)):
         return [_normalize(v) for v in value]
@@ -51,3 +59,10 @@ def canonical_json(fields: Mapping[str, Any]) -> str:
 
 def forecast_sha256(fields: Mapping[str, Any]) -> str:
     return hashlib.sha256(canonical_json(fields).encode("utf-8")).hexdigest()
+
+
+def content_sha256(payload: Any) -> str:
+    """Stable hash of arbitrary JSON-serialisable content (observations, seed)."""
+    normalized = _normalize(payload)
+    blob = json.dumps(normalized, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()

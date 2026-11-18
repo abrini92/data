@@ -221,6 +221,17 @@ class ForecastRegistry(Base):
     interval_low: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     interval_high: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     data_label: Mapped[str] = mapped_column(String(32), nullable=False)
+    # B3/B4: chained hash payload + baseline / vintage metadata
+    prev_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    p_base: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    baseline_method: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    series_id: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    vintage_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    observations_content_hash: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )
+    seed_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    wave_id: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

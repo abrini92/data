@@ -10,11 +10,10 @@ import json
 import re
 from typing import Any
 
-from data_ia.config import get_settings
 from data_ia.connectors.base import BaseConnector, CollectPayload
-from data_ia.connectors.http_util import get_json
 
 # Official portal API (same route the GASTAT Angular app uses). Not www.stats.gov.sa/api/.
+# REAL collection of this route is disabled (BRIEF-4 addendum) until documented+robots-cleared.
 CARDS_URL = "https://database.stats.gov.sa/gastatapi/portal/api/v1/indicators/cardsinfo"
 PORTAL = "https://dp.stats.gov.sa/opendata"
 
@@ -139,47 +138,29 @@ class GastatConnector(BaseConnector):
         return parse_gastat_payload(payload)
 
     def _collect_live(self) -> CollectPayload:
-        settings = get_settings()
-        key = (settings.gastat_api_key or "").strip()
-        headers: dict[str, str] = {}
-        if key:
-            headers["Ocp-Apim-Subscription-Key"] = key
-            headers["Authorization"] = f"Bearer {key}"
-        try:
-            payload, final_url, text = get_json(CARDS_URL, headers=headers)
-            self.write_cache("gastat.json", text)
-            records = self._parse(payload)
-            return self._finish(
-                url=final_url,
-                raw_text=text,
-                raw=payload,
-                records=records,
-                fetch_mode="live",
-                ok=bool(records),
-                errors=[] if records else ["live_ok_but_zero_parsed_records"],
-                meta={
-                    "license": "GASTAT open data terms [à confirmer]",
-                    "portal": PORTAL,
-                    "n_parsed": len(records),
-                    "endpoint": CARDS_URL,
-                },
-            )
-        except Exception as exc:  # noqa: BLE001
-            reason = f"gastat_unreachable:{type(exc).__name__}:{exc}"
-            if not key:
-                reason = (
-                    f"{reason}; set GASTAT_API_KEY if the developer portal requires one ({PORTAL})"
-                )
-            return self._finish(
-                url=CARDS_URL,
-                raw_text="",
-                raw=None,
-                records=[],
-                fetch_mode="skipped",
-                ok=False,
-                skipped_reason=reason,
-                meta={"skipped": True, "portal": PORTAL},
-            )
+        # BRIEF-4 addendum: gastatapi/portal/api disabled in REAL until proven
+        # to be a documented public developer API and allowed by robots.txt.
+        # Homepage indicator cards are not proof-series data.
+        reason = (
+            "gastatapi_portal_api_disabled_in_REAL: "
+            "route not proven public/documented; robots.txt not cleared; "
+            "homepage cards are not proof series"
+        )
+        return self._finish(
+            url=CARDS_URL,
+            raw_text="",
+            raw=None,
+            records=[],
+            fetch_mode="skipped",
+            ok=False,
+            skipped_reason=reason,
+            meta={
+                "skipped": True,
+                "portal": PORTAL,
+                "endpoint": CARDS_URL,
+                "real_disabled": True,
+            },
+        )
 
     def _collect_fixture(self) -> CollectPayload:
         # Prefer sanitised live-shaped fixture when present.

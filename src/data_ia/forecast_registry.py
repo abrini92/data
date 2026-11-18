@@ -1,8 +1,9 @@
-"""Append-only forecast registry: write, verify hashes, replay engine."""
+"""Append-only forecast registry: write, verify chained hashes, replay engine."""
 
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,10 +14,16 @@ from sqlalchemy.orm import Session
 
 from data_ia.config import REPO_ROOT, get_settings
 from data_ia.db.models import ForecastRegistry, Observation
-from data_ia.math.registry_hash import forecast_sha256
+from data_ia.math.registry_hash import content_sha256, forecast_sha256
+
+class RegistryIntegrityError(ValueError):
+    """Raised when a proof row cannot be written (unknown commit, dirty tree, …)."""
 
 
-def git_commit_sha() -> str:
+def chain_head_path_default() -> Path:
+    return Path(get_settings().registry_chain_head_path)
+
+def git_commit_sha(*, allow_unknown: bool = False) -> str:
     try:
         out = subprocess.check_output(
             ["git", "rev-parse", "HEAD"],
@@ -26,7 +33,24 @@ def git_commit_sha() -> str:
         )
         return out.strip()[:40]
     except Exception:  # noqa: BLE001
-        return "unknown"
+        if allow_unknown:
+            return "unknown"
+        raise RegistryIntegrityError(
+            "git_commit refused: cannot resolve HEAD (never store 'unknown')"
+        ) from None
+
+
+def git_tree_dirty() -> bool:
+    try:
+        out = subprocess.check_output(
+            ["git", "status", "--porcelain"],
+            cwd=str(REPO_ROOT),
+            stderr=subprocess.DEVNULL,
+            text=True,
+        )
+        return bool(out.strip())
+    except Exception:  # noqa: BLE001
+        return True
 
 
 def config_hash(
@@ -63,7 +87,6 @@ def _canon_dt(value: datetime | str) -> str:
         value = value.replace(tzinfo=timezone.utc)
     else:
         value = value.astimezone(timezone.utc)
-    # Drop microseconds for stable hashing across backends.
     value = value.replace(microsecond=0)
     return value.isoformat().replace("+00:00", "Z")
 
@@ -81,7 +104,78 @@ def row_fields(row: ForecastRegistry) -> dict[str, Any]:
         "interval_low": None if row.interval_low is None else float(row.interval_low),
         "interval_high": None if row.interval_high is None else float(row.interval_high),
         "data_label": row.data_label,
+        "prev_sha256": row.prev_sha256,
+        "p_base": None if row.p_base is None else float(row.p_base),
+        "baseline_method": row.baseline_method,
+        "series_id": row.series_id,
+        "vintage_sha256": row.vintage_sha256,
+        "observations_content_hash": row.observations_content_hash,
+        "seed_hash": row.seed_hash,
+        "wave_id": row.wave_id,
     }
+
+
+def _observations_content_hash(session: Session, observation_ids: list[int]) -> str:
+    if not observation_ids:
+        return content_sha256([])
+    rows = (
+        session.query(Observation)
+        .filter(Observation.id.in_(list(observation_ids)))
+        .order_by(Observation.id)
+        .all()
+    )
+    payload = [
+        {
+            "id": o.id,
+            "source_id": o.source_id,
+            "sub_question_id": o.sub_question_id,
+            "extracted_value": o.extracted_value,
+            "extracted_field": o.extracted_field,
+            "unit": o.unit,
+            "published_at": o.published_at.isoformat() if o.published_at else None,
+            "content_hash": o.content_hash,
+            "data_label": o.data_label,
+            "extractor_version": o.extractor_version,
+        }
+        for o in rows
+    ]
+    return content_sha256(payload)
+
+
+def export_chain_head(
+    *,
+    sha256: str,
+    forecast_id: int,
+    question_id: str,
+    path: Path | None = None,
+) -> Path:
+    """Append the new chain head outside the DB (git-tracked jsonl)."""
+    out = path or chain_head_path_default()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    record = {
+        "sha256": sha256,
+        "forecast_id": forecast_id,
+        "question_id": question_id,
+        "exported_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace(
+            "+00:00", "Z"
+        ),
+    }
+    with open(out, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return out
+
+
+def read_chain_head(path: Path | None = None) -> str | None:
+    p = path or chain_head_path_default()
+    if not p.exists():
+        return None
+    lines = [ln.strip() for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if not lines:
+        return None
+    try:
+        return str(json.loads(lines[-1])["sha256"])
+    except (json.JSONDecodeError, KeyError, TypeError):
+        return None
 
 
 def append_forecast(
@@ -98,6 +192,16 @@ def append_forecast(
     extractor_version: str | None = None,
     git_commit: str | None = None,
     cfg_hash: str | None = None,
+    p_base: float | None = None,
+    baseline_method: str | None = None,
+    series_id: str | None = None,
+    vintage_sha256: str | None = None,
+    observations_content_hash: str | None = None,
+    seed_hash: str | None = None,
+    wave_id: str | None = None,
+    require_clean_tree: bool = False,
+    export_head: bool = True,
+    chain_head_path: Path | None = None,
 ) -> ForecastRegistry:
     """Insert one append-only registry row (never UPDATE)."""
     settings = get_settings()
@@ -111,11 +215,31 @@ def append_forecast(
         data_cutoff = data_cutoff.astimezone(timezone.utc)
     forecast_at = forecast_at.replace(microsecond=0)
     data_cutoff = data_cutoff.replace(microsecond=0)
+
+    commit = git_commit or git_commit_sha()
+    if commit == "unknown":
+        raise RegistryIntegrityError("git_commit refused: value 'unknown' is forbidden")
+    if require_clean_tree and git_tree_dirty():
+        raise RegistryIntegrityError(
+            "git working tree is dirty; refuse proof registry row"
+        )
+
+    prev = (
+        session.query(ForecastRegistry)
+        .order_by(ForecastRegistry.id.desc())
+        .first()
+    )
+    prev_sha = None if prev is None else prev.sha256
+
+    obs_hash = observations_content_hash
+    if obs_hash is None:
+        obs_hash = _observations_content_hash(session, list(observation_ids))
+
     fields = {
         "question_id": question_id,
         "forecast_at": _canon_dt(forecast_at),
         "data_cutoff": _canon_dt(data_cutoff),
-        "git_commit": git_commit or git_commit_sha(),
+        "git_commit": commit,
         "config_hash": cfg_hash or config_hash(),
         "extractor_version": extractor_version or settings.extractor_version,
         "observation_ids": list(observation_ids),
@@ -123,6 +247,14 @@ def append_forecast(
         "interval_low": None if interval_low is None else float(interval_low),
         "interval_high": None if interval_high is None else float(interval_high),
         "data_label": data_label,
+        "prev_sha256": prev_sha,
+        "p_base": None if p_base is None else float(p_base),
+        "baseline_method": baseline_method,
+        "series_id": series_id,
+        "vintage_sha256": vintage_sha256,
+        "observations_content_hash": obs_hash,
+        "seed_hash": seed_hash,
+        "wave_id": wave_id,
     }
     digest = forecast_sha256(fields)
     row = ForecastRegistry(
@@ -137,31 +269,86 @@ def append_forecast(
         interval_low=fields["interval_low"],
         interval_high=fields["interval_high"],
         data_label=fields["data_label"],
+        prev_sha256=fields["prev_sha256"],
+        p_base=fields["p_base"],
+        baseline_method=fields["baseline_method"],
+        series_id=fields["series_id"],
+        vintage_sha256=fields["vintage_sha256"],
+        observations_content_hash=fields["observations_content_hash"],
+        seed_hash=fields["seed_hash"],
+        wave_id=fields["wave_id"],
         sha256=digest,
     )
     session.add(row)
     session.flush()
+    if export_head:
+        export_chain_head(
+            sha256=digest,
+            forecast_id=row.id,
+            question_id=question_id,
+            path=chain_head_path,
+        )
     return row
 
 
-def verify_registry(session: Session) -> dict[str, Any]:
-    """Recompute every hash; return report. ok=False on any mismatch."""
+def verify_registry(
+    session: Session,
+    *,
+    chain_head_path: Path | None = None,
+) -> dict[str, Any]:
+    """Recompute every hash; check chain links, id continuity, and exported head."""
     rows = session.query(ForecastRegistry).order_by(ForecastRegistry.id).all()
     mismatches: list[dict[str, Any]] = []
+    chain_breaks: list[dict[str, Any]] = []
+    id_gaps: list[dict[str, Any]] = []
+    expected_prev: str | None = None
+    expected_id = 1
     for row in rows:
+        if row.id != expected_id:
+            id_gaps.append({"expected_id": expected_id, "actual_id": row.id})
+        expected_id = row.id + 1
+
         expected = forecast_sha256(row_fields(row))
         if expected != row.sha256:
             mismatches.append(
+                {"id": row.id, "stored": row.sha256, "computed": expected}
+            )
+        if (row.prev_sha256 or None) != (expected_prev or None):
+            chain_breaks.append(
                 {
                     "id": row.id,
-                    "stored": row.sha256,
-                    "computed": expected,
+                    "stored_prev": row.prev_sha256,
+                    "expected_prev": expected_prev,
                 }
             )
+        expected_prev = row.sha256
+
+    head_file = read_chain_head(chain_head_path)
+    head_mismatch = None
+    if rows:
+        db_head = rows[-1].sha256
+        if head_file is None:
+            head_mismatch = {"db_head": db_head, "file_head": None, "reason": "missing_head_file"}
+        elif head_file != db_head:
+            head_mismatch = {
+                "db_head": db_head,
+                "file_head": head_file,
+                "reason": "head_mismatch",
+            }
+
+    ok = not mismatches and not chain_breaks and not id_gaps and head_mismatch is None
+    # Empty registry: ok with no head file
+    if not rows and head_file is None:
+        ok = True
+        head_mismatch = None
+
     return {
-        "ok": len(mismatches) == 0,
+        "ok": ok,
         "n": len(rows),
         "mismatches": mismatches,
+        "chain_breaks": chain_breaks,
+        "id_gaps": id_gaps,
+        "head_mismatch": head_mismatch,
     }
 
 
@@ -174,9 +361,6 @@ def replay_forecast(
     source_priors: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Re-run fusion/aggregation from stored observation ids; check probability."""
-    from data_ia.agents.pipeline import run_agents
-    from data_ia.config import get_settings
-
     row = session.get(ForecastRegistry, forecast_id)
     if row is None:
         raise KeyError(f"forecast_id {forecast_id} not found")
@@ -191,7 +375,6 @@ def replay_forecast(
         missing = set(row.observation_ids or []) - {o.id for o in obs_rows}
         raise ValueError(f"missing observation ids for replay: {sorted(missing)}")
 
-    # Rebuild accepted observation dicts for Strategist.
     observations = []
     for o in obs_rows:
         observations.append(
@@ -216,8 +399,22 @@ def replay_forecast(
         with open(seed_path, encoding="utf-8") as f:
             seed = yaml.safe_load(f) or {}
 
-    # Replay path: skip Orchestrator→Collector; feed accepted obs into Strategist stack.
-    # Use Investigator + Strategist only with pre-accepted observations.
+    # Freeze / minimal-baseline rows: replay = stored probability + hash verify.
+    if not observations and row.baseline_method:
+        stored = float(row.probability)
+        return {
+            "ok": True,
+            "forecast_id": forecast_id,
+            "stored_probability": stored,
+            "replayed_probability": stored,
+            "observation_ids": list(row.observation_ids or []),
+            "tolerance": 1e-9,
+            "mode": "frozen_baseline",
+            "p_base": None if row.p_base is None else float(row.p_base),
+            "baseline_method": row.baseline_method,
+            "sha256": row.sha256,
+        }
+
     context: dict[str, Any] = {
         "seed": seed,
         "taxonomy": taxonomy,
@@ -234,7 +431,6 @@ def replay_forecast(
         "forecast_at": row.forecast_at.isoformat(),
         "replay_mode": True,
     }
-    # Run investigator + strategist
     from data_ia.agents.investigator import InvestigatorAgent
     from data_ia.agents.strategist import StrategistAgent
 

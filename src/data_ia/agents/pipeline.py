@@ -219,13 +219,15 @@ def persist_cycle(session: Session, seed: dict[str, Any], cycle: dict[str, Any],
             collected_dt = datetime.fromisoformat(collected.replace("Z", "+00:00"))
         else:
             collected_dt = datetime.now(timezone.utc)
+        # B5: never invent published_at from collected_at.
         published = obs.get("published_at")
+        published_dt: datetime | None
         if isinstance(published, str):
             published_dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
         elif isinstance(published, datetime):
             published_dt = published
         else:
-            published_dt = collected_dt
+            published_dt = None
 
         row = Observation(
             source_id=obs["source_id"],

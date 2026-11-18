@@ -5,10 +5,17 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationError, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+# Fixed message — never echo env input_value (I8 / BRIEF-4 addendum).
+SETTINGS_ERROR_MESSAGE = (
+    "Invalid configuration. Check environment variables "
+    "(COLLECT_REAL_SOURCES, USE_SYNTHETIC, DATABASE_URL, …) "
+    "without printing their values."
+)
 
 
 class Settings(BaseSettings):
@@ -52,6 +59,14 @@ class Settings(BaseSettings):
         default=str(REPO_ROOT / "config" / "prior_mapping.yaml"),
         alias="PRIOR_MAPPING_PATH",
     )
+    freeze_calendar_path: str = Field(
+        default=str(REPO_ROOT / "config" / "freeze_calendar.yaml"),
+        alias="FREEZE_CALENDAR_PATH",
+    )
+    registry_chain_head_path: str = Field(
+        default=str(REPO_ROOT / "data" / "registry_chain_head.jsonl"),
+        alias="REGISTRY_CHAIN_HEAD_PATH",
+    )
     brier_min_n: int = Field(default=30, alias="BRIER_MIN_N")
     cma_timeout_seconds: float = Field(default=15.0, alias="CMA_TIMEOUT_SECONDS")
     eia_api_key: str = Field(default="", alias="EIA_API_KEY")
@@ -70,4 +85,18 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    try:
+        return Settings()
+    except ValidationError as exc:
+        # Do not surface pydantic input_value (may contain secrets).
+        raise ValueError(SETTINGS_ERROR_MESSAGE) from exc
+
+
+def settings_error_public_message(exc: BaseException) -> str:
+    """Return a log-safe error string (never dump env values)."""
+    if isinstance(exc, ValidationError):
+        return SETTINGS_ERROR_MESSAGE
+    text = str(exc)
+    if "input_value" in text or "Ctx" in text:
+        return SETTINGS_ERROR_MESSAGE
+    return text

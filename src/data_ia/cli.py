@@ -1,4 +1,4 @@
-"""CLI entrypoints: cycle, Brier proof, collect, verify-registry, replay."""
+"""CLI entrypoints: cycle, Brier proof, collect, verify-registry, replay, freeze, import-waves."""
 
 from __future__ import annotations
 
@@ -15,14 +15,8 @@ from data_ia.agents.pipeline import (
     load_yaml,
     run_offline_cycle,
 )
-from data_ia.config import REPO_ROOT, get_settings
-from data_ia.math.brier import (
-    ResolvedForecast,
-    class_base_rate,
-    evaluate_proof,
-    report_to_dict,
-    status_quo_baseline,
-)
+from data_ia.config import REPO_ROOT, get_settings, settings_error_public_message
+from data_ia.math.brier import evaluate_proof, report_to_dict
 
 
 def _settings_or_exit() -> int | None:
@@ -33,7 +27,13 @@ def _settings_or_exit() -> int | None:
         get_settings()
         return None
     except (SyntheticBlockedError, ValueError) as exc:
-        print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
+        print(
+            json.dumps(
+                {"ok": False, "error": settings_error_public_message(exc)},
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
         return 2
 
 
@@ -68,6 +68,7 @@ def cmd_brier(args: argparse.Namespace) -> int:
         return err
     from data_ia.db.models import ForecastRegistry, ResolvedQuestion
     from data_ia.db.session import get_session, try_init_db
+    from data_ia.math.brier_match import match_registry_to_resolved
     from data_ia.math.labels import MixedLabelError
 
     settings = get_settings()
@@ -76,10 +77,6 @@ def cmd_brier(args: argparse.Namespace) -> int:
     try_init_db()
     session = get_session()
     try:
-        # Pair registry rows with resolved outcomes by question_id when available.
-        # For synthetic proof demos: load outcomes from YAML but probabilities from
-        # registry rows that share question_id; if registry empty and --allow-seed-outcomes,
-        # still refuse hand-written probabilities — baseline/outcomes only from seed.
         resolved_path = Path(
             args.path or (REPO_ROOT / "seeds" / "synthetic_resolved.yaml")
         )
@@ -89,7 +86,6 @@ def cmd_brier(args: argparse.Namespace) -> int:
             for item in data.get("resolved_questions") or []:
                 outcomes_by_id[item["id"]] = item
 
-        # Also load DB resolved rows
         for row in session.query(ResolvedQuestion).all():
             outcomes_by_id.setdefault(
                 row.id,
@@ -100,60 +96,23 @@ def cmd_brier(args: argparse.Namespace) -> int:
                     "data_label": row.data_label,
                     "question_class": row.question_class,
                     "resolved_on": row.resolved_on.isoformat() if row.resolved_on else None,
+                    "wave_id": (row.meta or {}).get("wave_id") if row.meta else None,
                 },
             )
 
         registry_rows = session.query(ForecastRegistry).order_by(ForecastRegistry.id).all()
-
-        # Build class base rates from resolved outcomes before each forecast_at.
-        class_outcomes: dict[str, list[int]] = {}
-        for item in outcomes_by_id.values():
-            cls = item.get("question_class") or "default"
-            class_outcomes.setdefault(cls, []).append(int(item["outcome"]))
-
-        forecasts: list[ResolvedForecast] = []
-        for row in registry_rows:
-            outcome_item = outcomes_by_id.get(row.question_id)
-            if outcome_item is None:
-                continue
-            cls = outcome_item.get("question_class") or "default"
-            # Base rate from class outcomes (not 0.5). Status-quo alt for change Qs.
-            text = str(outcome_item.get("text") or "")
-            change_q = "change" in text.lower() or "will " in text.lower()
-            prior_outcomes = class_outcomes.get(cls) or [
-                int(outcome_item["outcome"])
-            ]
-            # Exclude this outcome itself for a proper prior when possible
-            others = [o for o in prior_outcomes]
-            base = class_base_rate(others, default=0.5)
-            if change_q and base == 0.5 and len(set(others)) <= 1:
-                base = status_quo_baseline(change_question=True)
-                # For change questions status-quo P(change)=0; if that is too harsh
-                # when class rate exists, prefer class rate:
-                if others:
-                    base = class_base_rate(others, default=0.5)
-
-            forecasts.append(
-                ResolvedForecast(
-                    question_id=row.question_id,
-                    probability=float(row.probability),
-                    outcome=int(outcome_item["outcome"]),
-                    label=row.data_label or outcome_item.get("label") or "SYNTHETIC",
-                    baseline_probability=float(base),
-                    forecast_id=row.id,
-                    question_class=cls,
-                )
-            )
+        forecasts, meta = match_registry_to_resolved(registry_rows, outcomes_by_id)
 
         if not forecasts:
-            # No matched registry↔outcome pairs: report empty / non interprétable.
             report = evaluate_proof([], min_n=min_n)
             payload = report_to_dict(report)
             payload["source"] = "forecast_registry"
             payload["matched"] = 0
             payload["registry_n"] = len(registry_rows)
+            payload["rejected"] = meta.get("rejected")
             payload["note"] = (
-                "No registry forecasts matched resolved outcomes. "
+                "No eligible registry forecasts matched resolved outcomes "
+                "(late / post-resolution / post-deadline rows rejected). "
                 "Engine probabilities are never read from YAML."
             )
             print(json.dumps(payload, indent=2, ensure_ascii=False))
@@ -168,7 +127,9 @@ def cmd_brier(args: argparse.Namespace) -> int:
         payload = report_to_dict(report)
         payload["source"] = "forecast_registry"
         payload["matched"] = len(forecasts)
+        payload["n_questions"] = meta.get("n_questions")
         payload["registry_n"] = len(registry_rows)
+        payload["rejected"] = meta.get("rejected")
         print(json.dumps(payload, indent=2, ensure_ascii=False))
         return 0
     finally:
@@ -216,6 +177,129 @@ def cmd_replay(args: argparse.Namespace) -> int:
         )
         print(json.dumps(report, indent=2))
         return 0 if report.get("ok") else 1
+    finally:
+        session.close()
+
+
+def cmd_import_waves(args: argparse.Namespace) -> int:
+    """Import vague1 / vague1b with SHA-256 verification (Priority 0 A)."""
+    err = _settings_or_exit()
+    if err is not None:
+        return err
+    from data_ia.db.session import get_session, try_init_db
+    from data_ia.wave_import import WaveHashError, import_waves, load_wave
+
+    names = list(args.wave) if args.wave else ["vague1", "vague1b"]
+    if args.verify_only:
+        reports = []
+        try:
+            for name in names:
+                bundle = load_wave(name, require_hash=True)
+                reports.append(
+                    {
+                        "wave": bundle.wave_id,
+                        "file": bundle.path.name,
+                        "sha256": bundle.sha256,
+                        "ok": True,
+                        "n_questions": len(bundle.questions),
+                        "bases_sha256": bundle.bases_sha256,
+                        "errata": None
+                        if bundle.errata_path is None
+                        else bundle.errata_path.name,
+                    }
+                )
+        except WaveHashError as exc:
+            print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
+            return 1
+        print(json.dumps({"ok": True, "waves": reports}, indent=2, ensure_ascii=False))
+        return 0
+
+    try_init_db()
+    session = get_session()
+    try:
+        report = import_waves(session, names=names)
+        session.commit()
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0
+    except WaveHashError as exc:
+        session.rollback()
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
+        return 1
+    finally:
+        session.close()
+
+
+def cmd_freeze(args: argparse.Namespace) -> int:
+    """Freeze one proof question into the registry (B4)."""
+    err = _settings_or_exit()
+    if err is not None:
+        return err
+    from data_ia.db.session import get_session, reset_engine, try_init_db
+    from data_ia.forecast_registry import RegistryIntegrityError
+    from data_ia.freeze import FreezeError, freeze_question, vintage_sha_from_changes
+    from data_ia.freeze_calendar import FreezeDeadlineError
+
+    if args.database_url:
+        import os
+
+        os.environ["DATABASE_URL"] = args.database_url
+        get_settings.cache_clear()
+        reset_engine()
+
+    if args.chain_head:
+        import os
+
+        os.environ["REGISTRY_CHAIN_HEAD_PATH"] = args.chain_head
+        get_settings.cache_clear()
+
+    changes = None
+    if args.series_changes:
+        changes = [float(x) for x in args.series_changes.split(",")]
+    event_history = None
+    if args.event_history:
+        event_history = [int(x) for x in args.event_history.split(",")]
+
+    vintage = args.vintage_sha
+    if not vintage and changes is not None:
+        vintage = vintage_sha_from_changes(changes, series_id=args.series)
+
+    forecast_at = args.forecast_at
+    data_cutoff = args.data_cutoff
+    if data_cutoff is None:
+        print(
+            json.dumps({"ok": False, "error": "--data-cutoff is required"}, indent=2),
+            file=sys.stderr,
+        )
+        return 2
+
+    try_init_db()
+    session = get_session()
+    try:
+        result = freeze_question(
+            session,
+            question_id=args.question,
+            probability=float(args.probability),
+            data_cutoff=data_cutoff,
+            forecast_at=forecast_at,
+            series_id=args.series,
+            vintage_sha256=str(vintage),
+            data_label=args.label,
+            wave_id=args.wave,
+            changes=changes,
+            event_history=event_history,
+            baseline_method=args.baseline_method,
+            p_base_override=args.p_base,
+            baseline_justification=args.baseline_justification,
+            allow_dirty=bool(args.allow_dirty) or str(args.label).upper() == "TEST",
+            export_head=True,
+        )
+        session.commit()
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0
+    except (FreezeError, FreezeDeadlineError, RegistryIntegrityError, ValueError) as exc:
+        session.rollback()
+        print(json.dumps({"ok": False, "error": str(exc)}, indent=2), file=sys.stderr)
+        return 1
     finally:
         session.close()
 
@@ -291,7 +375,14 @@ def cmd_collect(args: argparse.Namespace) -> int:
             "real": real,
             "meta": {
                 k: payload.meta.get(k)
-                for k in ("n_parsed", "data_label", "fallback", "status", "timeout_seconds")
+                for k in (
+                    "n_parsed",
+                    "data_label",
+                    "fallback",
+                    "status",
+                    "timeout_seconds",
+                    "real_disabled",
+                )
                 if k in (payload.meta or {})
             },
         }
@@ -342,6 +433,56 @@ def main(argv: list[str] | None = None) -> int:
     p_replay = sub.add_parser("replay", help="Replay engine from stored observation ids")
     p_replay.add_argument("--forecast-id", type=int, required=True)
     p_replay.set_defaults(func=cmd_replay)
+
+    p_import = sub.add_parser(
+        "import-waves",
+        help="Import vague1/vague1b after SHA-256 verification",
+    )
+    p_import.add_argument(
+        "--wave",
+        action="append",
+        help="Wave name (default: vague1 and vague1b). Repeatable.",
+    )
+    p_import.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="Only verify SHA-256 sidecars; do not write the DB",
+    )
+    p_import.set_defaults(func=cmd_import_waves)
+
+    p_freeze = sub.add_parser(
+        "freeze",
+        help="Freeze one proof question (p_model + persist_v3 p_base) into the registry",
+    )
+    p_freeze.add_argument("--question", required=True, help="Question id, e.g. P1")
+    p_freeze.add_argument("--probability", type=float, required=True)
+    p_freeze.add_argument("--data-cutoff", required=True, help="ISO timestamp (≠ forecast_at)")
+    p_freeze.add_argument("--forecast-at", default=None, help="ISO timestamp (default: now)")
+    p_freeze.add_argument("--series", required=True, help="Frozen series id / label")
+    p_freeze.add_argument("--vintage-sha", default=None, help="Millésime content SHA-256")
+    p_freeze.add_argument(
+        "--series-changes",
+        default=None,
+        help="Comma-separated signed changes for persist_v3 (no PMI levels printed)",
+    )
+    p_freeze.add_argument(
+        "--event-history",
+        default=None,
+        help="Comma-separated 0/1 events for frequency baseline",
+    )
+    p_freeze.add_argument("--baseline-method", default=None, choices=["persist_v3", "frequency", "0.5"])
+    p_freeze.add_argument("--p-base", type=float, default=None, help="Override stored p_base")
+    p_freeze.add_argument("--baseline-justification", default=None)
+    p_freeze.add_argument("--label", default="TEST", help="data_label (TEST for test registry)")
+    p_freeze.add_argument("--wave", default=None)
+    p_freeze.add_argument("--database-url", default=None, help="Override DATABASE_URL (test registry)")
+    p_freeze.add_argument("--chain-head", default=None, help="Override chain-head jsonl path")
+    p_freeze.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow dirty git tree (implied for --label TEST)",
+    )
+    p_freeze.set_defaults(func=cmd_freeze)
 
     p_agents = sub.add_parser("agents", help="Describe the six agents")
     p_agents.set_defaults(func=cmd_agents)

@@ -96,7 +96,8 @@ class ControllerAgent(Agent):
                 field_name=field_name,
                 value=obs.get("extracted_value"),
                 unit=obs.get("unit"),
-                published_at=obs.get("published_at") or obs.get("collected_at"),
+                # B5: no collected_at fallback — missing published_at fails validation.
+                published_at=obs.get("published_at"),
                 source_passage=obs.get("source_passage") or obs.get("raw_doc"),
                 sub_question_id=obs.get("sub_question_id"),
             )

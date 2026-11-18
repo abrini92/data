@@ -35,14 +35,6 @@ class CollectorAgent(Agent):
         errors: list[str] = []
         checks = ["hash", "timestamp", "extractor_version", "extraction_fields"]
 
-        # Label: SYNTHETIC unless real collection produced the body.
-        default_label = REAL if settings.collect_real_sources else SYNTHETIC
-        if not settings.use_synthetic and not settings.collect_real_sources:
-            # Offline stub path is synthetic even when USE_SYNTHETIC=false —
-            # the cycle must be explicitly allowed via use_synthetic for seeding,
-            # or we label stub observations SYNTHETIC and rely on gating at pipeline.
-            default_label = SYNTHETIC
-
         forecast_at = context.get("forecast_at") or datetime.now(timezone.utc).isoformat()
         data_cutoff = context.get("data_cutoff") or forecast_at
 
@@ -50,7 +42,6 @@ class CollectorAgent(Agent):
             body, url_used, fetch_note = self._fetch(src, settings.collect_real_sources)
             content_hash = hashlib.sha256(body.encode("utf-8")).hexdigest()
             live = fetch_note == "live"
-            label = REAL if live else SYNTHETIC
             for leaf in leaves:
                 prompt = (
                     f"Extract a probability signal for sub-question {leaf['id']}: "
@@ -62,7 +53,47 @@ class CollectorAgent(Agent):
                     schema_hint=f"field: probability; unit: {q_unit}",
                 )
                 structured = resp.structured or {}
-                published = structured.get("published_at") or data_cutoff
+                # B5: stub extraction is always SYNTHETIC, even after HTTP 200.
+                provider = (resp.provider or "").lower()
+                stub_extract = provider == "stub" or bool(
+                    (structured or {}).get("provider") == "stub"
+                )
+                if stub_extract or not live:
+                    label = SYNTHETIC
+                else:
+                    label = REAL
+                # B5: missing published_at is refused — no fallback to data_cutoff.
+                published = structured.get("published_at")
+                if not published:
+                    errors.append(
+                        f"missing published_at for {src.get('id')}/{leaf['id']}"
+                    )
+                    observations.append(
+                        {
+                            "source_id": src["id"],
+                            "sub_question_id": leaf["id"],
+                            "raw_doc": body[:4000],
+                            "extracted_value": structured.get("value"),
+                            "extracted_field": structured.get("field_name", "probability"),
+                            "unit": structured.get("unit") or q_unit,
+                            "published_at": None,
+                            "source_passage": structured.get("source_passage") or body[:500],
+                            "url": url_used,
+                            "collected_at": datetime.now(timezone.utc).isoformat(),
+                            "content_hash": content_hash,
+                            "extractor_version": settings.extractor_version,
+                            "status": "rejected",
+                            "rejection_reason": "missing_published_at",
+                            "data_label": normalize_label(label),
+                            "meta": {
+                                "fetch_note": fetch_note,
+                                "llm_provider": resp.provider,
+                                "stub_extract": stub_extract,
+                                "illustrative": True,
+                            },
+                        }
+                    )
+                    continue
                 unit = structured.get("unit") or q_unit
                 passage = structured.get("source_passage") or body[:500]
                 observations.append(
@@ -84,7 +115,8 @@ class CollectorAgent(Agent):
                         "meta": {
                             "fetch_note": fetch_note,
                             "llm_provider": resp.provider,
-                            "illustrative": not live,
+                            "stub_extract": stub_extract,
+                            "illustrative": label == SYNTHETIC,
                         },
                     }
                 )
